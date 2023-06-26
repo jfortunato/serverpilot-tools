@@ -3,10 +3,7 @@ package serverpilot
 import (
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"strings"
-	"time"
 )
 
 var (
@@ -39,36 +36,4 @@ func (r Runtime) Version() (string, error) {
 
 	// Remove the "php" prefix.
 	return string(r[3:]), nil
-}
-
-type ServerPilotClient struct {
-	credentials Credentials
-}
-
-func NewClient(user, key string) *ServerPilotClient {
-	return &ServerPilotClient{
-		credentials: Credentials{
-			ClientId: user,
-			ApiKey:   key,
-		},
-	}
-}
-
-func (c *ServerPilotClient) Get(url string) (string, error) {
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return "", fmt.Errorf("error while making request: %s", err)
-	}
-	req.SetBasicAuth(c.credentials.ClientId, c.credentials.ApiKey)
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("error while making request: %s", err)
-	}
-	defer resp.Body.Close()
-
-	buf := new(strings.Builder)
-	_, err = io.Copy(buf, resp.Body)
-
-	return buf.String(), nil
 }
