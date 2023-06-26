@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/jfortunato/serverpilot-tools/internal/serverpilot"
 	"strings"
+	"time"
 )
 
 var (
@@ -17,7 +18,7 @@ type HttpClient interface {
 	Get(url string) (string, error)
 }
 
-func FilterApps(c HttpClient, minRuntime, maxRuntime serverpilot.Runtime) ([]serverpilot.App, error) {
+func FilterApps(c HttpClient, minRuntime, maxRuntime serverpilot.Runtime, createdAfter, createdBefore serverpilot.DateCreated) ([]serverpilot.App, error) {
 	if minRuntime == "" {
 		minRuntime = "php0.0.0"
 	}
@@ -32,6 +33,10 @@ func FilterApps(c HttpClient, minRuntime, maxRuntime serverpilot.Runtime) ([]ser
 	maxR, err := maxRuntime.Version()
 	if err != nil {
 		return nil, err
+	}
+
+	if createdBefore == 0 {
+		createdBefore = serverpilot.DateCreated(time.Now().Unix())
 	}
 
 	resp, err := c.Get("https://api.serverpilot.io/v1/apps")
@@ -49,12 +54,37 @@ func FilterApps(c HttpClient, minRuntime, maxRuntime serverpilot.Runtime) ([]ser
 	}
 
 	// Filter the apps by runtime.
+	apps := filterByRuntime(appResponse.Data, minR, maxR)
+	// Filter the apps by creation date.
+	apps = filterByDate(apps, createdAfter, createdBefore)
+
+	return apps, nil
+}
+
+func filterByRuntime(apps []serverpilot.App, minR, maxR string) []serverpilot.App {
 	var filteredApps []serverpilot.App
-	for _, app := range appResponse.Data {
-		appVersion, _ := app.Runtime.Version()
+
+	for _, app := range apps {
+		appVersion, err := app.Runtime.Version()
+		if err != nil {
+			panic(err)
+		}
 		if appVersion >= minR && appVersion <= maxR {
 			filteredApps = append(filteredApps, app)
 		}
 	}
-	return filteredApps, nil
+
+	return filteredApps
+}
+
+func filterByDate(apps []serverpilot.App, createdAfter, createdBefore serverpilot.DateCreated) []serverpilot.App {
+	var filteredApps []serverpilot.App
+
+	for _, app := range apps {
+		if app.Datecreated >= createdAfter && app.Datecreated <= createdBefore {
+			filteredApps = append(filteredApps, app)
+		}
+	}
+
+	return filteredApps
 }

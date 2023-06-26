@@ -1,7 +1,6 @@
 package apps
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/jfortunato/serverpilot-tools/internal/filter"
 	"github.com/jfortunato/serverpilot-tools/internal/serverpilot"
@@ -10,11 +9,12 @@ import (
 	"os"
 	"strings"
 	"text/tabwriter"
-	"time"
 )
 
 var MinRuntime string
 var MaxRuntime string
+var CreatedAfter string
+var CreatedBefore string
 
 func newListCommand() *cobra.Command {
 	cmd := &cobra.Command{
@@ -22,11 +22,22 @@ func newListCommand() *cobra.Command {
 		Aliases: []string{"ls"},
 		Short:   "List apps",
 		Args:    cobra.ExactArgs(2),
+		//PreRunE: func(cmd *cobra.Command, args []string) error {
+		//	// Validate here?
+		//},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			minRuntime := serverpilot.Runtime(MinRuntime)
 			maxRuntime := serverpilot.Runtime(MaxRuntime)
+			createdAfter, err := serverpilot.DateCreatedFromDate(CreatedAfter)
+			if err != nil {
+				return fmt.Errorf("created-after must be in the format YYYY-MM-DD")
+			}
+			createdBefore, err := serverpilot.DateCreatedFromDate(CreatedBefore)
+			if err != nil {
+				return fmt.Errorf("created-before must be in the format YYYY-MM-DD")
+			}
 
-			listApps(args[0], args[1], minRuntime, maxRuntime)
+			listApps(args[0], args[1], minRuntime, maxRuntime, createdAfter, createdBefore)
 
 			return nil
 		},
@@ -35,25 +46,21 @@ func newListCommand() *cobra.Command {
 	flags := cmd.Flags()
 	flags.StringVar(&MinRuntime, "min-runtime", "", "Only display apps with a runtime greater than or equal to the specified runtime")
 	flags.StringVar(&MaxRuntime, "max-runtime", "", "Only display apps with a runtime less than or equal to the specified runtime")
+	flags.StringVar(&CreatedAfter, "created-after", "", "Only display apps created after the specified date")
+	flags.StringVar(&CreatedBefore, "created-before", "", "Only display apps created before the specified date")
 
 	return cmd
 }
 
-func listApps(user, key string, minRuntime, maxRuntime serverpilot.Runtime) {
+func listApps(user, key string, minRuntime, maxRuntime serverpilot.Runtime, createdAfter, createdBefore serverpilot.DateCreated) {
 	c := serverpilot.NewClient(user, key)
 
-	apps, err := filter.FilterApps(c, minRuntime, maxRuntime)
+	apps, err := filter.FilterApps(c, minRuntime, maxRuntime, createdAfter, createdBefore)
 	if err != nil {
 		log.Fatalln("error while filtering apps: ", err)
 	}
 
-	//prettyPrint(apps)
 	printApps(apps)
-}
-
-func prettyPrint(i interface{}) {
-	s, _ := json.MarshalIndent(i, "", "  ")
-	log.Println(string(s))
 }
 
 func printApps(apps []serverpilot.App) {
@@ -61,8 +68,7 @@ func printApps(apps []serverpilot.App) {
 	fmt.Fprintln(w, "ID\tNAME\tSERVER\tDOMAINS\tRUNTIME\tCREATED\t")
 	for _, app := range apps {
 		domains := strings.Join(app.Domains, ", ")
-		created := time.Unix(app.Datecreated, 0).Format("2006-01-02")
-		fmt.Fprintln(w, app.Id+"\t"+app.Name+"\t"+app.Serverid+"\t"+domains+"\t"+string(app.Runtime)+"\t"+created+"\t")
+		fmt.Fprintln(w, app.Id+"\t"+app.Name+"\t"+app.Serverid+"\t"+domains+"\t"+string(app.Runtime)+"\t"+app.Datecreated.String()+"\t")
 	}
 	w.Flush()
 }
