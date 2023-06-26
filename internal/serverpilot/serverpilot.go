@@ -16,10 +16,12 @@ type Credentials struct {
 }
 
 type App struct {
-	Id       string  `json:"id"`
-	Name     string  `json:"name"`
-	Serverid string  `json:"serverid"`
-	Runtime  Runtime `json:"runtime"`
+	Id          string   `json:"id"`
+	Name        string   `json:"name"`
+	Serverid    string   `json:"serverid"`
+	Runtime     Runtime  `json:"runtime"`
+	Domains     []string `json:"domains"`
+	Datecreated int64    `json:"datecreated"`
 }
 
 type AppResponse struct {

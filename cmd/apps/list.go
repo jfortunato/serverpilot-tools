@@ -8,7 +8,9 @@ import (
 	"github.com/spf13/cobra"
 	"log"
 	"os"
+	"strings"
 	"text/tabwriter"
+	"time"
 )
 
 var MinRuntime string
@@ -56,9 +58,11 @@ func prettyPrint(i interface{}) {
 
 func printApps(apps []serverpilot.App) {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-	fmt.Fprintln(w, "ID\tNAME\tRUNTIME\t")
+	fmt.Fprintln(w, "ID\tNAME\tSERVER\tDOMAINS\tRUNTIME\tCREATED\t")
 	for _, app := range apps {
-		fmt.Fprintln(w, app.Id+"\t"+app.Name+"\t"+string(app.Runtime)+"\t")
+		domains := strings.Join(app.Domains, ", ")
+		created := time.Unix(app.Datecreated, 0).Format("2006-01-02")
+		fmt.Fprintln(w, app.Id+"\t"+app.Name+"\t"+app.Serverid+"\t"+domains+"\t"+string(app.Runtime)+"\t"+created+"\t")
 	}
 	w.Flush()
 }
