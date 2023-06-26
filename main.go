@@ -33,7 +33,7 @@ func prettyPrint(i interface{}) {
 
 func printApps(apps []serverpilot.App) {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-	fmt.Fprintln(w, "ID\tName\tRuntime\t")
+	fmt.Fprintln(w, "ID\tNAME\tRUNTIME\t")
 	for _, app := range apps {
 		fmt.Fprintln(w, app.Id+"\t"+app.Name+"\t"+string(app.Runtime)+"\t")
 	}
