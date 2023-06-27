@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"github.com/jfortunato/serverpilot-tools/cmd/apps"
+	"github.com/jfortunato/serverpilot-tools/cmd/servers"
 	"github.com/spf13/cobra"
 	"os"
 )
@@ -16,6 +17,7 @@ var rootCmd = &cobra.Command{
 func Execute() {
 	rootCmd.AddCommand(
 		apps.NewAppsCommand(),
+		servers.NewServersCommand(),
 	)
 
 	if err := rootCmd.Execute(); err != nil {

@@ -26,8 +26,19 @@ type App struct {
 	Datecreated DateCreated `json:"datecreated"`
 }
 
+type Server struct {
+	Id          string      `json:"id"`
+	Name        string      `json:"name"`
+	Ipaddress   string      `json:"lastaddress"`
+	Datecreated DateCreated `json:"datecreated"`
+}
+
 type AppResponse struct {
 	Data []App `json:"data"`
+}
+
+type ServerResponse struct {
+	Data []Server `json:"data"`
 }
 
 type Runtime string
