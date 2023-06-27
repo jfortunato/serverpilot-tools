@@ -8,22 +8,49 @@ import (
 	"time"
 )
 
+var (
+	ErrCouldNotMakeRequest = fmt.Errorf("could not make request to ServerPilot API")
+	ErrCouldNotCache       = fmt.Errorf("could not cache response")
+)
+
 // Makes all the requests to the ServerPilot API. Since we don't want to hammer
 // the API, we'll rate limit requests by default.
 type serverPilotClient struct {
 	credentials    Credentials
 	g              httpGetter
 	s              sleeper
+	c              cacher
 	hasMadeRequest bool
 }
 
 func (c *serverPilotClient) Get(url string) (string, error) {
+	// Check if we have a cached response for this url.
+	if c.c != nil {
+		resp, err := c.c.Get(url)
+		if err == nil {
+			return resp, nil
+		}
+	}
+
 	// If this is not the first request, sleep for the configured duration.
 	if c.hasMadeRequest {
 		c.s.Sleep()
 	}
 	c.hasMadeRequest = true
-	return c.g.Get(url)
+	resp, err := c.g.Get(url)
+	if err != nil {
+		return "", fmt.Errorf("%w: %s", ErrCouldNotMakeRequest, err)
+	}
+
+	// Cache the response.
+	if c.c != nil {
+		err = c.c.Set(url, resp)
+		if err != nil {
+			return "", fmt.Errorf("%w: %s", ErrCouldNotCache, err)
+		}
+	}
+
+	return resp, nil
 }
 
 // Constructor for creating our serverPilotClient. User/key are used to authenticate with the ServerPilot API.
@@ -38,6 +65,7 @@ func NewClient(user, key string) *serverPilotClient {
 			p: key,
 		},
 		s: &defaultSleeper{},
+		c: &tmpFileCacher{},
 	}
 }
 
@@ -79,4 +107,9 @@ type defaultSleeper struct{}
 func (s *defaultSleeper) Sleep() {
 	// Sleep for 500 milliseconds.
 	time.Sleep(500 * time.Millisecond)
+}
+
+type cacher interface {
+	Get(key string) (string, error)
+	Set(key string, value string) error
 }
