@@ -11,6 +11,7 @@ func NewAppsCommand() *cobra.Command {
 
 	cmd.AddCommand(
 		newListCommand(),
+		newStrandedCommand(),
 	)
 
 	return cmd
