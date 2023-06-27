@@ -5,15 +5,14 @@ import (
 	"github.com/jfortunato/serverpilot-tools/internal/dns"
 	"github.com/jfortunato/serverpilot-tools/internal/filter"
 	"github.com/jfortunato/serverpilot-tools/internal/serverpilot"
+	"github.com/jfortunato/serverpilot-tools/internal/servers"
 	"github.com/spf13/cobra"
 	"io"
 	"log"
 	"os"
-	"strings"
 	"text/tabwriter"
 )
 
-var Servers string
 var Verbose bool
 
 func newStrandedCommand() *cobra.Command {
@@ -36,13 +35,26 @@ func newStrandedCommand() *cobra.Command {
 
 			c := serverpilot.NewClient(args[0], args[1])
 
+			// Get all servers, and extract their ip addresses
+			s, err := servers.GetServers(c)
+			if err != nil {
+				return fmt.Errorf("error while getting servers: %w", err)
+			}
+			var serverIps []string
+			for _, server := range s {
+				serverIps = append(serverIps, server.Ipaddress)
+			}
+
 			// Get all ServerPilot apps
-			apps, _ := filter.FilterApps(c, "", "", 0, 0)
+			apps, err := filter.FilterApps(c, "", "", 0, 0)
+			if err != nil {
+				return fmt.Errorf("error while getting apps: %w", err)
+			}
 
 			var domainToStatus map[string]int
 			domainToStatus = make(map[string]int)
 
-			dnsChecker := dns.NewDnsChecker(dns.NewResolver(nil, nil, logger), strings.Split(Servers, " "))
+			dnsChecker := dns.NewDnsChecker(dns.NewResolver(nil, nil, logger), serverIps)
 
 			// Loop through each domain, and check if it resolves to the server
 			for _, app := range apps {
@@ -61,7 +73,6 @@ func newStrandedCommand() *cobra.Command {
 	}
 
 	flags := cmd.Flags()
-	flags.StringVar(&Servers, "servers", "", "Ip address of the server to check against")
 	flags.BoolVarP(&Verbose, "verbose", "v", false, "Verbose output")
 
 	return cmd
