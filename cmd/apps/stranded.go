@@ -14,6 +14,7 @@ import (
 )
 
 var Verbose bool
+var IncludeUnkown bool
 
 func newStrandedCommand() *cobra.Command {
 	cmd := &cobra.Command{
@@ -65,8 +66,21 @@ func newStrandedCommand() *cobra.Command {
 				}
 			}
 
+			// Only print out the stranded apps by default, but allow the user to include unknown domains with a flag
+			var domainsToPrint map[string]int
+			domainsToPrint = make(map[string]int)
+			for domain, status := range domainToStatus {
+				if status == dns.STRANDED {
+					domainsToPrint[domain] = status
+				}
+
+				if IncludeUnkown && status == dns.UNKNOWN {
+					domainsToPrint[domain] = status
+				}
+			}
+
 			// Print out the stranded apps, with their status (STRANDED/PARTIAL/UNKNOWN)
-			printDomains(domainToStatus)
+			printDomains(domainsToPrint)
 
 			return nil
 		},
@@ -74,6 +88,7 @@ func newStrandedCommand() *cobra.Command {
 
 	flags := cmd.Flags()
 	flags.BoolVarP(&Verbose, "verbose", "v", false, "Verbose output")
+	flags.BoolVarP(&IncludeUnkown, "include-unknown", "u", false, "Include domains with unknown status")
 
 	return cmd
 }
