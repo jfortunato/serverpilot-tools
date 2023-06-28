@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/jfortunato/serverpilot-tools/internal/serverpilot"
-	"reflect"
+	"gotest.tools/v3/assert"
 	"testing"
 )
 
@@ -20,8 +20,8 @@ func TestFilterApps(t *testing.T) {
 		got, err := FilterApps(client, "", "", 0, 0)
 		want := []serverpilot.App{app1, app2}
 
-		assertEqualSlice(t, got, want)
-		assertNoError(t, err)
+		assert.DeepEqual(t, got, want)
+		assert.NilError(t, err)
 	})
 
 	t.Run("it handles an error from the http client request", func(t *testing.T) {
@@ -30,7 +30,7 @@ func TestFilterApps(t *testing.T) {
 
 		_, err := FilterApps(client, "", "", 0, 0)
 
-		assertError(t, err, ErrInvalidRequest)
+		assert.ErrorIs(t, err, ErrInvalidRequest)
 	})
 
 	t.Run("it handles an error while decoding the json response", func(t *testing.T) {
@@ -41,7 +41,7 @@ func TestFilterApps(t *testing.T) {
 
 		_, err := FilterApps(client, "", "", 0, 0)
 
-		assertError(t, err, ErrInvalidJson)
+		assert.ErrorIs(t, err, ErrInvalidJson)
 	})
 
 	t.Run("it filters apps by runtime", func(t *testing.T) {
@@ -99,8 +99,8 @@ func TestFilterApps(t *testing.T) {
 
 				got, err := FilterApps(client, tt.minRuntime, tt.maxRuntime, 0, 0)
 
-				assertEqualSlice(t, got, tt.want)
-				assertNoError(t, err)
+				assert.DeepEqual(t, got, tt.want)
+				assert.NilError(t, err)
 			})
 		}
 	})
@@ -160,8 +160,8 @@ func TestFilterApps(t *testing.T) {
 
 				got, err := FilterApps(client, "", "", tt.minCreated, tt.maxCreated)
 
-				assertEqualSlice(t, got, tt.want)
-				assertNoError(t, err)
+				assert.DeepEqual(t, got, tt.want)
+				assert.NilError(t, err)
 			})
 		}
 	})
@@ -181,7 +181,7 @@ func TestFilterApps(t *testing.T) {
 
 				_, err := FilterApps(client, tt.minRuntime, tt.maxRuntime, 0, 0)
 
-				assertError(t, err, serverpilot.ErrInvalidRuntime)
+				assert.ErrorIs(t, err, serverpilot.ErrInvalidRuntime)
 			})
 		}
 	})
@@ -210,34 +210,6 @@ func responseWithApps(apps []serverpilot.App) string {
 func stringToDateCreated(date string) serverpilot.DateCreated {
 	d, _ := serverpilot.DateCreatedFromDate(date)
 	return d
-}
-
-func assertNoError(t *testing.T, err error) {
-	t.Helper()
-
-	if err != nil {
-		t.Errorf("got an error (%s), but didn't want one", err)
-	}
-}
-
-func assertError(t *testing.T, got, want error) {
-	t.Helper()
-
-	if got == nil {
-		t.Fatal("didn't get an error but wanted one")
-	}
-
-	if !errors.Is(got, want) {
-		t.Errorf("got %q, want %q", got, want)
-	}
-}
-
-func assertEqualSlice(t *testing.T, got, want any) {
-	t.Helper()
-
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %v want %v", got, want)
-	}
 }
 
 type HttpClientStub struct {

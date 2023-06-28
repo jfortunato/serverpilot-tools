@@ -2,6 +2,7 @@ package serverpilot
 
 import (
 	"errors"
+	"gotest.tools/v3/assert"
 	"testing"
 )
 
@@ -31,14 +32,10 @@ func TestServerPilotClient(t *testing.T) {
 			}
 
 			// Assert that every Get call resulted in a call to the underlying http client.
-			if wrapped.calls != tt.wantApiCalls {
-				t.Errorf("got %d calls to the wrapper client, want %d", wrapped.calls, tt.wantApiCalls)
-			}
+			assert.Equal(t, wrapped.calls, tt.wantApiCalls, tt.name)
 
 			// Assert that we got the expected number of sleep calls.
-			if sleeper.calls != tt.wantSleepCalls {
-				t.Errorf("got %d calls to the sleeper, want %d", sleeper.calls, tt.wantSleepCalls)
-			}
+			assert.Equal(t, sleeper.calls, tt.wantSleepCalls, tt.name)
 		}
 	})
 
@@ -50,7 +47,7 @@ func TestServerPilotClient(t *testing.T) {
 
 		_, err := client.Get("https://api.serverpilot.io/v1/apps")
 
-		assertError(t, err, ErrCouldNotMakeRequest)
+		assert.ErrorIs(t, err, ErrCouldNotMakeRequest)
 	})
 
 	t.Run("it should cache some requests made to the api for some amount of time", func(t *testing.T) {
@@ -80,14 +77,10 @@ func TestServerPilotClient(t *testing.T) {
 			}
 
 			// Assert that every Get call resulted in a call to the underlying http client.
-			if wrapped.calls != tt.wantApiCalls {
-				t.Errorf("got %d calls to the wrapper client, want %d", wrapped.calls, tt.wantApiCalls)
-			}
+			assert.Equal(t, wrapped.calls, tt.wantApiCalls, tt.name)
 
 			// Assert that we got the expected number of sleep calls.
-			if sleeper.calls != tt.wantSleepCalls {
-				t.Errorf("got %d calls to the sleeper, want %d", sleeper.calls, tt.wantSleepCalls)
-			}
+			assert.Equal(t, sleeper.calls, tt.wantSleepCalls, tt.name)
 		}
 	})
 
@@ -99,7 +92,7 @@ func TestServerPilotClient(t *testing.T) {
 
 		_, err := client.Get("https://api.serverpilot.io/v1/apps")
 
-		assertError(t, err, ErrCouldNotCache)
+		assert.ErrorIs(t, err, ErrCouldNotCache)
 	})
 }
 
@@ -146,16 +139,4 @@ func (s *InMemorySpyCacher) Set(key string, value string) error {
 	}
 	s.cache[key] = value
 	return nil
-}
-
-func assertError(t *testing.T, got, want error) {
-	t.Helper()
-
-	if got == nil {
-		t.Fatal("didn't get an error but wanted one")
-	}
-
-	if !errors.Is(got, want) {
-		t.Errorf("got %q, want %q", got, want)
-	}
 }

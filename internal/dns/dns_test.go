@@ -1,6 +1,9 @@
 package dns
 
-import "testing"
+import (
+	"gotest.tools/v3/assert"
+	"testing"
+)
 
 func TestDNS(t *testing.T) {
 	t.Run("it should return the correct status for the domain", func(t *testing.T) {
@@ -45,9 +48,7 @@ func TestDNS(t *testing.T) {
 				got := checker.CheckStatus(tt.domain, tt.serverIp)
 				want := tt.want
 
-				if got != want {
-					t.Errorf("got %q want %q", got, want)
-				}
+				assert.Equal(t, got, want)
 			})
 		}
 	})

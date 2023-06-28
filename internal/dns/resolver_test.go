@@ -2,10 +2,10 @@ package dns
 
 import (
 	"errors"
+	"gotest.tools/v3/assert"
 	"io"
 	"log"
 	"net"
-	"reflect"
 	"testing"
 )
 
@@ -16,7 +16,7 @@ func TestResolver(t *testing.T) {
 		got := resolver.Resolve("example.com")
 		want := []string{"127.0.0.1"}
 
-		assertEqualSlice(t, got, want)
+		assert.DeepEqual(t, got, want)
 	})
 
 	t.Run("it should return an error that occurs during the network request", func(t *testing.T) {
@@ -27,9 +27,7 @@ func TestResolver(t *testing.T) {
 
 		got := resolver.Resolve("domain-behind-cloudflare.com")
 
-		if got != nil {
-			t.Errorf("got %v want %v", got, nil)
-		}
+		assert.Assert(t, got == nil)
 	})
 
 	t.Run("it should check the base domains nameservers when resolving a subdomain", func(t *testing.T) {
@@ -49,7 +47,7 @@ func TestResolver(t *testing.T) {
 
 				got := resolver.Resolve(tt.domain)
 
-				assertEqualSlice(t, got, tt.want)
+				assert.DeepEqual(t, got, tt.want)
 			})
 		}
 	})
@@ -84,12 +82,4 @@ func NsLookupStub(host string) ([]*net.NS, error) {
 
 	// Don't allow any other hostnames to be resolved
 	panic(errors.New("unknown host " + host))
-}
-
-func assertEqualSlice(t *testing.T, got, want any) {
-	t.Helper()
-
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %v want %v", got, want)
-	}
 }
