@@ -7,15 +7,14 @@ const (
 )
 
 type DnsChecker struct {
-	r   IpResolver
-	ips []string
+	r IpResolver
 }
 
-func NewDnsChecker(r IpResolver, serverIps []string) *DnsChecker {
-	return &DnsChecker{r, serverIps}
+func NewDnsChecker(r IpResolver) *DnsChecker {
+	return &DnsChecker{r}
 }
 
-func (c *DnsChecker) CheckStatus(domain string) int {
+func (c *DnsChecker) CheckStatus(domain string, serverIp string) int {
 	resolvedIps := c.r.Resolve(domain)
 
 	if resolvedIps == nil {
@@ -23,10 +22,8 @@ func (c *DnsChecker) CheckStatus(domain string) int {
 	}
 
 	for _, ip := range resolvedIps {
-		for _, serverIp := range c.ips {
-			if ip == serverIp {
-				return OK
-			}
+		if ip == serverIp {
+			return OK
 		}
 	}
 

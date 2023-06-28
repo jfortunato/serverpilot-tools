@@ -41,10 +41,6 @@ func newStrandedCommand() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("error while getting servers: %w", err)
 			}
-			var serverIps []string
-			for _, server := range s {
-				serverIps = append(serverIps, server.Ipaddress)
-			}
 
 			// Get all ServerPilot apps
 			apps, err := filter.FilterApps(c, "", "", 0, 0)
@@ -55,12 +51,12 @@ func newStrandedCommand() *cobra.Command {
 			var domainToStatus map[string]int
 			domainToStatus = make(map[string]int)
 
-			dnsChecker := dns.NewDnsChecker(dns.NewResolver(nil, nil, logger), serverIps)
+			dnsChecker := dns.NewDnsChecker(dns.NewResolver(nil, nil, logger))
 
 			// Loop through each domain, and check if it resolves to the server
 			for _, app := range apps {
 				for _, domain := range app.Domains {
-					status := dnsChecker.CheckStatus(domain)
+					status := dnsChecker.CheckStatus(domain, getServerIpForApp(app, s))
 
 					domainToStatus[domain] = status
 				}
@@ -91,6 +87,16 @@ func newStrandedCommand() *cobra.Command {
 	flags.BoolVarP(&IncludeUnkown, "include-unknown", "u", false, "Include domains with unknown status")
 
 	return cmd
+}
+
+func getServerIpForApp(app serverpilot.App, servers []serverpilot.Server) string {
+	for _, server := range servers {
+		if server.Id == app.Serverid {
+			return server.Ipaddress
+		}
+	}
+
+	return ""
 }
 
 func printDomains(domains map[string]int) {

@@ -7,14 +7,14 @@ func TestDNS(t *testing.T) {
 		var tests = []struct {
 			name        string
 			domain      string
-			serverIps   []string
+			serverIp    string
 			resolvedIps map[string]string
 			want        int
 		}{
 			{
 				"ok",
 				"example.com",
-				[]string{"127.0.0.1"},
+				"127.0.0.1",
 				map[string]string{
 					"example.com": "127.0.0.1",
 				},
@@ -23,7 +23,7 @@ func TestDNS(t *testing.T) {
 			{
 				"stranded",
 				"stranded.example.com",
-				[]string{"127.0.0.1"},
+				"127.0.0.1",
 				map[string]string{
 					"stranded.example.com": "0.0.0.0",
 				},
@@ -32,7 +32,7 @@ func TestDNS(t *testing.T) {
 			{
 				"unknown",
 				"unknown.example.com",
-				[]string{"127.0.0.1"},
+				"127.0.0.1",
 				map[string]string{},
 				UNKNOWN,
 			},
@@ -40,9 +40,9 @@ func TestDNS(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				checker := NewDnsChecker(&IpResolverStub{tt.resolvedIps}, tt.serverIps)
+				checker := NewDnsChecker(&IpResolverStub{tt.resolvedIps})
 
-				got := checker.CheckStatus(tt.domain)
+				got := checker.CheckStatus(tt.domain, tt.serverIp)
 				want := tt.want
 
 				if got != want {
