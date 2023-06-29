@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"github.com/jfortunato/serverpilot-tools/internal/http"
 	"log"
+	"regexp"
+	"strings"
 )
 
 var (
@@ -95,7 +97,15 @@ func findMatchingRecord(domain string, records []DnsRecord) []string {
 
 	// Find the DNS record for the domain
 	for _, record := range records {
-		if record.Name == domain {
+		// For the regex, we need to escape the dots in the domain name and replace the asterisks with a regex wildcard
+		// Escape the dots
+		recordName := strings.Replace(record.Name, ".", `\.`, -1)
+		// Replace the asterisks with a regex wildcard
+		recordName = strings.Replace(recordName, "*", ".+", -1)
+
+		regex, _ := regexp.Compile(fmt.Sprintf("^%s$", recordName))
+
+		if regex.MatchString(domain) {
 			if record.Type == "CNAME" {
 				target := record.Content
 

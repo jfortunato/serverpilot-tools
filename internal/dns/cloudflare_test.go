@@ -70,6 +70,23 @@ func TestCloudflare(t *testing.T) {
 				},
 				[]string{"127.0.0.1"},
 			},
+			{
+				"matched domain is a wildcard CNAME - matches A record",
+				"www.example.com",
+				[]DnsRecord{
+					{"CNAME", "*.example.com", "example.com"},
+					{"A", "example.com", "127.0.0.1"},
+				},
+				[]string{"127.0.0.1"},
+			},
+			{
+				"matched domain is a wildcard A record",
+				"www.example.com",
+				[]DnsRecord{
+					{"A", "*.example.com", "127.0.0.1"},
+				},
+				[]string{"127.0.0.1"},
+			},
 		}
 
 		// These tests will always use the same zone response
