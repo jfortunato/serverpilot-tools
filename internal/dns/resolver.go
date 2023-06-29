@@ -31,7 +31,7 @@ func NewResolver(cfResolver IpResolver, ipLookup IpLookupFunc, nsLookup NsLookup
 	return &Resolver{cfResolver, ipLookup, nsLookup, l}
 }
 
-func (r *Resolver) Resolve(domain string) []string {
+func (r *Resolver) Resolve(domain string) ([]string, error) {
 	// If the domain is behind CloudFlare, we won't be able to resolve the real IP addresses unless
 	// we have CloudFlare API credentials for the domain.
 	if r.isBehindCloudFlare(getBaseDomain(domain)) {
@@ -48,7 +48,7 @@ func (r *Resolver) Resolve(domain string) []string {
 		ipStrings = append(ipStrings, ip.String())
 	}
 
-	return ipStrings
+	return ipStrings, nil
 }
 
 func (r *Resolver) isBehindCloudFlare(domain string) bool {

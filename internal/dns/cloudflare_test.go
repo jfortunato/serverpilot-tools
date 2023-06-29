@@ -16,7 +16,7 @@ func TestCloudflare(t *testing.T) {
 
 		resolver := NewCloudflareResolver(log.New(io.Discard, "", 0), clientStub, nil, nil)
 
-		got := resolver.Resolve("domain-behind-cloudflare.com")
+		got, _ := resolver.Resolve("domain-behind-cloudflare.com")
 
 		assert.Assert(t, got == nil)
 	})
@@ -84,7 +84,7 @@ func TestCloudflare(t *testing.T) {
 
 				resolver := NewCloudflareResolver(log.New(io.Discard, "", 0), clientStub, &Credentials{"foo", "bar"}, []string{"foo.ns.cloudflare.com", "bar.ns.cloudflare.com"})
 
-				got := resolver.Resolve(tt.domain)
+				got, _ := resolver.Resolve(tt.domain)
 
 				assert.DeepEqual(t, got, tt.want)
 			})
@@ -96,7 +96,7 @@ func TestCloudflare(t *testing.T) {
 
 		resolver := NewCloudflareResolver(log.New(io.Discard, "", 0), clientStub, &Credentials{"foo", "bar"}, []string{"foo.ns.cloudflare.com", "bar.ns.cloudflare.com"})
 
-		got := resolver.Resolve("example.com")
+		got, _ := resolver.Resolve("example.com")
 
 		assert.Assert(t, got == nil)
 	})
@@ -110,8 +110,8 @@ func TestCloudflare(t *testing.T) {
 
 		resolver := NewCloudflareResolver(log.New(io.Discard, "", 0), clientStub, &Credentials{"foo", "bar"}, []string{"foo.ns.cloudflare.com", "bar.ns.cloudflare.com"})
 
-		_ = resolver.Resolve("example.com")
-		_ = resolver.Resolve("example.com")
+		_, _ = resolver.Resolve("example.com")
+		_, _ = resolver.Resolve("example.com")
 
 		// Each Resolve call should result in 2 api requests (one for the zone, one for the dns records)
 		// The second call should not result in any api requests.

@@ -15,9 +15,8 @@ func NewDnsChecker(r IpResolver) *DnsChecker {
 }
 
 func (c *DnsChecker) CheckStatus(domain string, serverIp string) int {
-	resolvedIps := c.r.Resolve(domain)
-
-	if resolvedIps == nil {
+	resolvedIps, err := c.r.Resolve(domain)
+	if err != nil {
 		return UNKNOWN
 	}
 
@@ -31,7 +30,7 @@ func (c *DnsChecker) CheckStatus(domain string, serverIp string) int {
 }
 
 // IpResolver is an interface for resolving a domain to its IP address(s). It will return
-// the ip addresses when it can, or a nil slice if it cannot.
+// the ip addresses when it can, or an error if it cannot.
 type IpResolver interface {
-	Resolve(domain string) []string
+	Resolve(domain string) ([]string, error)
 }

@@ -75,9 +75,9 @@ func NewCloudflareResolver(l *log.Logger, c http.CachingRateLimitedClient, creds
 // Resolve resolves the domain using the Cloudflare API. It implements the IpResolver interface.
 // We cache the DNS records, even though the http requests are also cached by the http.CachingRateLimitedClient, because
 // it's faster to read from memory than to read from disk.
-func (r *CloudflareResolver) Resolve(domain string) []string {
+func (r *CloudflareResolver) Resolve(domain string) ([]string, error) {
 	if r.creds == nil {
-		return nil
+		return nil, fmt.Errorf("%w: no credentials provided", ErrCouldNotMakeRequest)
 	}
 
 	// Get all DNS records for the account, and cache them
@@ -87,7 +87,7 @@ func (r *CloudflareResolver) Resolve(domain string) []string {
 
 	records := r.cachedRecoreds
 
-	return findMatchingRecord(domain, records)
+	return findMatchingRecord(domain, records), nil
 }
 
 func findMatchingRecord(domain string, records []DnsRecord) []string {

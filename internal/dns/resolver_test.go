@@ -13,7 +13,7 @@ func TestResolver(t *testing.T) {
 	t.Run("it should resolve the ip addresses for the given domain name", func(t *testing.T) {
 		resolver := newResolverWithStubs()
 
-		got := resolver.Resolve("example.com")
+		got, _ := resolver.Resolve("example.com")
 		want := []string{"127.0.0.1"}
 
 		assert.DeepEqual(t, got, want)
@@ -45,7 +45,7 @@ func TestResolver(t *testing.T) {
 				}
 				resolver.cfResolver = &IpResolverStub{stub}
 
-				got := resolver.Resolve(tt.domain)
+				got, _ := resolver.Resolve(tt.domain)
 
 				assert.DeepEqual(t, got, tt.expectedResult)
 			})
@@ -67,7 +67,7 @@ func TestResolver(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				resolver := newResolverWithStubs()
 
-				got := resolver.Resolve(tt.domain)
+				got, _ := resolver.Resolve(tt.domain)
 
 				assert.DeepEqual(t, got, tt.want)
 			})

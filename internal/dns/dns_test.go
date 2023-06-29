@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"errors"
 	"gotest.tools/v3/assert"
 	"testing"
 )
@@ -36,8 +37,15 @@ func TestDNS(t *testing.T) {
 				"unknown",
 				"unknown.example.com",
 				"127.0.0.1",
-				map[string]string{},
+				nil,
 				UNKNOWN,
+			},
+			{
+				"expired/not pointed",
+				"expired.com",
+				"127.0.0.1",
+				map[string]string{},
+				STRANDED,
 			},
 		}
 
@@ -58,10 +66,14 @@ type IpResolverStub struct {
 	ips map[string]string
 }
 
-func (s *IpResolverStub) Resolve(domain string) []string {
+func (s *IpResolverStub) Resolve(domain string) ([]string, error) {
+	if s.ips == nil {
+		return nil, errors.New("no ips")
+	}
+
 	ip, ok := s.ips[domain]
 	if !ok {
-		return nil
+		return nil, nil
 	}
-	return []string{ip}
+	return []string{ip}, nil
 }
