@@ -8,15 +8,16 @@ import (
 )
 
 type Resolver struct {
-	lookupIp IpLookupFunc
-	lookupNs NsLookupFunc
-	l        *log.Logger
+	cfResolver IpResolver
+	lookupIp   IpLookupFunc
+	lookupNs   NsLookupFunc
+	l          *log.Logger
 }
 
 type IpLookupFunc func(host string) ([]net.IP, error)
 type NsLookupFunc func(host string) ([]*net.NS, error)
 
-func NewResolver(ipLookup IpLookupFunc, nsLookup NsLookupFunc, l *log.Logger) *Resolver {
+func NewResolver(cfResolver IpResolver, ipLookup IpLookupFunc, nsLookup NsLookupFunc, l *log.Logger) *Resolver {
 	// Default to net.LookupIP
 	if ipLookup == nil {
 		ipLookup = net.LookupIP
@@ -27,14 +28,14 @@ func NewResolver(ipLookup IpLookupFunc, nsLookup NsLookupFunc, l *log.Logger) *R
 		nsLookup = net.LookupNS
 	}
 
-	return &Resolver{ipLookup, nsLookup, l}
+	return &Resolver{cfResolver, ipLookup, nsLookup, l}
 }
 
 func (r *Resolver) Resolve(domain string) []string {
 	// If the domain is behind CloudFlare, we won't be able to resolve the real IP addresses unless
 	// we have CloudFlare API credentials for the domain.
 	if r.isBehindCloudFlare(getBaseDomain(domain)) {
-		return nil
+		return r.cfResolver.Resolve(domain)
 	}
 
 	r.l.Println("Looking up IP addresses for", domain, "...")

@@ -5,6 +5,8 @@ import (
 	"github.com/jfortunato/serverpilot-tools/internal/serverpilot"
 	"github.com/jfortunato/serverpilot-tools/internal/servers"
 	"github.com/spf13/cobra"
+	"io"
+	"log"
 	"os"
 	"text/tabwriter"
 )
@@ -16,7 +18,9 @@ func newListCommand() *cobra.Command {
 		Short:   "List servers",
 		Args:    cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c := serverpilot.NewClient(args[0], args[1])
+			logger := log.New(io.Discard, "", 0)
+
+			c := serverpilot.NewClient(logger, args[0], args[1])
 
 			s, err := servers.GetServers(c)
 			if err != nil {

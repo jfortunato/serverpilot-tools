@@ -4,17 +4,20 @@ import (
 	"fmt"
 	"github.com/jfortunato/serverpilot-tools/internal/dns"
 	"github.com/jfortunato/serverpilot-tools/internal/filter"
+	"github.com/jfortunato/serverpilot-tools/internal/http"
 	"github.com/jfortunato/serverpilot-tools/internal/serverpilot"
 	"github.com/jfortunato/serverpilot-tools/internal/servers"
 	"github.com/spf13/cobra"
 	"io"
 	"log"
 	"os"
+	"strings"
 	"text/tabwriter"
 )
 
 var Verbose bool
 var IncludeUnkown bool
+var CloudflareCredentials string
 
 func newStrandedCommand() *cobra.Command {
 	cmd := &cobra.Command{
@@ -34,7 +37,7 @@ func newStrandedCommand() *cobra.Command {
 				logger.SetOutput(os.Stdout)
 			}
 
-			c := serverpilot.NewClient(args[0], args[1])
+			c := serverpilot.NewClient(logger, args[0], args[1])
 
 			// Get all servers, and extract their ip addresses
 			s, err := servers.GetServers(c)
@@ -51,7 +54,12 @@ func newStrandedCommand() *cobra.Command {
 			var domainToStatus map[string]int
 			domainToStatus = make(map[string]int)
 
-			dnsChecker := dns.NewDnsChecker(dns.NewResolver(nil, nil, logger))
+			var cfResolver *dns.CloudflareResolver
+			if CloudflareCredentials != "" {
+				creds := strings.Split(CloudflareCredentials, ":")
+				cfResolver = dns.NewCloudflareResolver(logger, http.NewClient(logger), &dns.Credentials{creds[0], creds[1]}, nil)
+			}
+			dnsChecker := dns.NewDnsChecker(dns.NewResolver(cfResolver, nil, nil, logger))
 
 			// Loop through each domain, and check if it resolves to the server
 			for _, app := range apps {
@@ -85,6 +93,7 @@ func newStrandedCommand() *cobra.Command {
 	flags := cmd.Flags()
 	flags.BoolVarP(&Verbose, "verbose", "v", false, "Verbose output")
 	flags.BoolVarP(&IncludeUnkown, "include-unknown", "u", false, "Include domains with unknown status")
+	flags.StringVarP(&CloudflareCredentials, "cloudflare-credentials", "", "", "Cloudflare credentials (email:api-key)")
 
 	return cmd
 }

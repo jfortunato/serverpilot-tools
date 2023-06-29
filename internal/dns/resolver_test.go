@@ -11,7 +11,7 @@ import (
 
 func TestResolver(t *testing.T) {
 	t.Run("it should resolve the ip addresses for the given domain name", func(t *testing.T) {
-		resolver := NewResolver(IpLookupStub, NsLookupStub, log.New(io.Discard, "", 0))
+		resolver := newResolverWithStubs()
 
 		got := resolver.Resolve("example.com")
 		want := []string{"127.0.0.1"}
@@ -22,12 +22,34 @@ func TestResolver(t *testing.T) {
 	t.Run("it should return an error that occurs during the network request", func(t *testing.T) {
 	})
 
-	t.Run("it should not be able to resolve a domain behind CloudFlare nameservers that we don't have api credentials for", func(t *testing.T) {
-		resolver := NewResolver(IpLookupStub, NsLookupStub, log.New(io.Discard, "", 0))
+	t.Run("it should defer to the cloudflare resolver when the domain is on cloudflare nameservers", func(t *testing.T) {
+		var tests = []struct {
+			domain         string
+			stubbedResult  string
+			expectedResult []string
+		}{
+			{"domain-behind-cloudflare.com", "", nil},
+			{"domain-behind-cloudflare.com", "127.0.0.1", []string{"127.0.0.1"}},
+		}
 
-		got := resolver.Resolve("domain-behind-cloudflare.com")
+		for _, tt := range tests {
+			t.Run("it returns the result from the cloudflare resolver", func(t *testing.T) {
+				resolver := newResolverWithStubs()
 
-		assert.Assert(t, got == nil)
+				// Override the cloudflare resolver with this stub
+				var stub map[string]string
+				if tt.stubbedResult == "" {
+					stub = map[string]string{}
+				} else {
+					stub = map[string]string{tt.domain: tt.stubbedResult}
+				}
+				resolver.cfResolver = &IpResolverStub{stub}
+
+				got := resolver.Resolve(tt.domain)
+
+				assert.DeepEqual(t, got, tt.expectedResult)
+			})
+		}
 	})
 
 	t.Run("it should check the base domains nameservers when resolving a subdomain", func(t *testing.T) {
@@ -43,7 +65,7 @@ func TestResolver(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				resolver := NewResolver(IpLookupStub, NsLookupStub, log.New(io.Discard, "", 0))
+				resolver := newResolverWithStubs()
 
 				got := resolver.Resolve(tt.domain)
 
@@ -51,6 +73,15 @@ func TestResolver(t *testing.T) {
 			})
 		}
 	})
+}
+
+func newResolverWithStubs() *Resolver {
+	return NewResolver(
+		&IpResolverStub{},
+		IpLookupStub,
+		NsLookupStub,
+		log.New(io.Discard, "", 0),
+	)
 }
 
 func IpLookupStub(host string) ([]net.IP, error) {

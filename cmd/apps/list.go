@@ -5,6 +5,7 @@ import (
 	"github.com/jfortunato/serverpilot-tools/internal/filter"
 	"github.com/jfortunato/serverpilot-tools/internal/serverpilot"
 	"github.com/spf13/cobra"
+	"io"
 	"log"
 	"os"
 	"strings"
@@ -53,7 +54,9 @@ func newListCommand() *cobra.Command {
 }
 
 func listApps(user, key string, minRuntime, maxRuntime serverpilot.Runtime, createdAfter, createdBefore serverpilot.DateCreated) {
-	c := serverpilot.NewClient(user, key)
+	logger := log.New(io.Discard, "", 0)
+
+	c := serverpilot.NewClient(logger, user, key)
 
 	apps, err := filter.FilterApps(c, minRuntime, maxRuntime, createdAfter, createdBefore)
 	if err != nil {

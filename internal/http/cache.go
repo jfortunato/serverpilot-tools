@@ -1,12 +1,10 @@
-package serverpilot
+package http
 
 import (
-	"encoding/gob"
+	"bytes"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 )
 
@@ -14,11 +12,20 @@ import (
 const CacheFilename = "serverpilot-tools.cache"
 
 // CacheLifetime is the amount of time that a cache file is valid for. It is based on the file mtime.
-const CacheLifetime = 10 * time.Minute
+const CacheLifetime = 24 * time.Hour // 1 day
 
 // tmpFileCacher implements the cacher interface. It caches serverpilot API
 // responses in a temporary file.
 type tmpFileCacher struct{}
+
+func (c *tmpFileCacher) Has(key string) bool {
+	b, err := os.ReadFile(c.filename())
+	if err != nil {
+		return false
+	}
+
+	return bytes.Contains(b, []byte(key))
+}
 
 func (c *tmpFileCacher) Get(key string) (string, error) {
 	// If the cache file is older than the cache lifetime, delete it.
@@ -30,61 +37,32 @@ func (c *tmpFileCacher) Get(key string) (string, error) {
 		return "", fmt.Errorf("cache file expired")
 	}
 
-	// Open the cache file.
-	f, err := os.Open(c.filename())
-	if err != nil {
-		return "", fmt.Errorf("could not open cache file: %s", err)
-	}
-	defer f.Close()
-
 	// Read the contents of the file.
-	buf := new(strings.Builder)
-	_, err = io.Copy(buf, f)
+	b, err := os.ReadFile(c.filename())
 	if err != nil {
 		return "", fmt.Errorf("could not read cache file: %s", err)
 	}
 
-	// Convert the contents to a map
-	m, err := c.decode(buf.String())
-	if err != nil {
-		return "", fmt.Errorf("could not decode cache file: %s", err)
-	}
+	// Find the line that starts with the key.
+	i := bytes.Index(b, []byte(key))
+	// Find the end of the line.
+	n := bytes.Index(b[i:], []byte("\n"))
+	// Extract the value.
+	value := string(b[i+len(key)+2 : i+n])
 
-	// Return the value for the given key
-	val, ok := m[key]
-	if !ok {
-		return "", fmt.Errorf("could not find key %s in cache", key)
-	}
-	return val, nil
+	return value, nil
 }
 
 func (c *tmpFileCacher) Set(key string, value string) error {
 	// Create the file if it doesn't exist.
-	f, err := os.OpenFile(c.filename(), os.O_CREATE|os.O_RDWR, 0644)
+	f, err := os.OpenFile(c.filename(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("could not open cache file: %s", err)
 	}
 	defer f.Close()
 
-	// Convert the contents to a map
-	s := new(strings.Builder)
-	_, err = io.Copy(s, f)
-	m, err := c.decode(s.String())
-	if err != nil {
-		return fmt.Errorf("could not decode cache file: %s", err)
-	}
-
-	// Add the new key/value pair to the map
-	m[key] = value
-
-	// Encode the map back to a string
-	contents, err := c.encode(m)
-	if err != nil {
-		return fmt.Errorf("could not encode cache file: %s", err)
-	}
-
-	// Write the contents to the file
-	_, err = f.WriteString(contents)
+	// Append the key/value pair to the file.
+	_, err = f.WriteString(fmt.Sprintf("%s: %s\n", key, value))
 	if err != nil {
 		return fmt.Errorf("could not write to cache file: %s", err)
 	}
@@ -94,30 +72,6 @@ func (c *tmpFileCacher) Set(key string, value string) error {
 
 func (c *tmpFileCacher) filename() string {
 	return filepath.Join(os.TempDir(), CacheFilename)
-}
-
-func (c *tmpFileCacher) decode(contents string) (map[string]string, error) {
-	if contents == "" {
-		return make(map[string]string), nil
-	}
-
-	var m map[string]string
-	d := gob.NewDecoder(strings.NewReader(contents))
-	err := d.Decode(&m)
-	if err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
-func (c *tmpFileCacher) encode(m map[string]string) (string, error) {
-	buf := new(strings.Builder)
-	e := gob.NewEncoder(buf)
-	err := e.Encode(m)
-	if err != nil {
-		return "", err
-	}
-	return buf.String(), nil
 }
 
 func (c *tmpFileCacher) isExpired() bool {
