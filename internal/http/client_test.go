@@ -40,7 +40,7 @@ func TestClient(t *testing.T) {
 
 	t.Run("it should return an error that occurs while fetching", func(t *testing.T) {
 		client := newClientWithStubs()
-		client.f = stubFetcher(&callsSpy{}, errors.New("some http error"))
+		client.f = stubFetcher(errors.New("some http error"))
 
 		_, err := client.GetFromCacheOrFetchWithRateLimit(Request{Url: "https://example.com"})
 
@@ -58,12 +58,14 @@ func TestClient(t *testing.T) {
 		}
 
 		for _, tt := range tests {
-			callsSpy := &callsSpy{}
-			fetcher := stubFetcher(callsSpy, nil)
+			spyCalls := 0
 
 			client := newClientWithStubs()
 			client.c = &InMemoryCacher{}
-			client.f = fetcher
+			client.f = func(req Request) (string, error) {
+				spyCalls++
+				return "response", nil
+			}
 
 			// Make the desired number of Get calls.
 			for i := 0; i < tt.makeGetCalls; i++ {
@@ -74,7 +76,7 @@ func TestClient(t *testing.T) {
 			}
 
 			// Assert that we got the expected number of api calls.
-			assert.Equal(t, callsSpy.calls, tt.wantApiCalls, tt.name)
+			assert.Equal(t, spyCalls, tt.wantApiCalls, tt.name)
 		}
 	})
 
@@ -95,7 +97,7 @@ func newClientWithStubs() *Client {
 	client := NewClient(log.New(io.Discard, "", 0))
 	client.s = &SpySleeper{}
 	client.c = &NeverCacher{}
-	client.f = stubFetcher(&callsSpy{}, nil)
+	client.f = stubFetcher(nil)
 	return client
 }
 
@@ -144,13 +146,8 @@ func (c *NeverCacher) Has(key string) bool                { return false }
 func (c *NeverCacher) Get(key string) (string, error)     { return "", nil }
 func (c *NeverCacher) Set(key string, value string) error { return nil }
 
-type callsSpy struct {
-	calls int
-}
-
-func stubFetcher(callsSpy *callsSpy, errStub error) FetchForString {
+func stubFetcher(errStub error) FetchForString {
 	return func(req Request) (string, error) {
-		callsSpy.calls++
 		return "response", errStub
 	}
 }
