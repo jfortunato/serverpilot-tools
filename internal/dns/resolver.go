@@ -12,6 +12,7 @@ type Resolver struct {
 	lookupIp   IpLookupFunc
 	lookupNs   NsLookupFunc
 	l          *log.Logger
+	cachedNs   map[string][]string
 }
 
 type IpLookupFunc func(host string) ([]net.IP, error)
@@ -28,7 +29,7 @@ func NewResolver(cfResolver IpResolver, ipLookup IpLookupFunc, nsLookup NsLookup
 		nsLookup = net.LookupNS
 	}
 
-	return &Resolver{cfResolver, ipLookup, nsLookup, l}
+	return &Resolver{cfResolver: cfResolver, lookupIp: ipLookup, lookupNs: nsLookup, l: l}
 }
 
 func (r *Resolver) Resolve(domain string) ([]string, error) {
@@ -52,17 +53,25 @@ func (r *Resolver) Resolve(domain string) ([]string, error) {
 }
 
 func (r *Resolver) isBehindCloudFlare(domain string) bool {
-	r.l.Println("Looking up nameservers for", domain, "...")
-	ns, _ := r.lookupNs(domain)
-	var nsStrings []string
-	for _, n := range ns {
-		nsStrings = append(nsStrings, n.Host)
+	// Check if we've already looked up the nameservers for this domain
+	if r.cachedNs == nil || r.cachedNs[domain] == nil {
+		r.l.Println("Looking up nameservers for", domain, "...")
+		ns, _ := r.lookupNs(domain)
+		var nsStrings []string
+		for _, n := range ns {
+			nsStrings = append(nsStrings, n.Host)
+		}
+		r.l.Println("Nameservers for", domain, "are", nsStrings)
+
+		// Cache the nameservers for this domain
+		r.cachedNs = map[string][]string{domain: nsStrings}
 	}
-	r.l.Println("Nameservers for", domain, "are", nsStrings)
+
+	ns := r.cachedNs[domain]
 
 	for _, n := range ns {
 		// Check if the nameserver format matches *.ns.cloudflare.com.
-		if len(n.Host) >= 18 && n.Host[len(n.Host)-18:] == "ns.cloudflare.com." {
+		if len(n) >= 18 && n[len(n)-18:] == "ns.cloudflare.com." {
 			return true
 		}
 	}

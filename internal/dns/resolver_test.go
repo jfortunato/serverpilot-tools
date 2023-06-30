@@ -73,6 +73,20 @@ func TestResolver(t *testing.T) {
 			})
 		}
 	})
+
+	t.Run("it should cache nameserver lookups for the base domain", func(t *testing.T) {
+		spyCalls := 0
+		resolver := newResolverWithStubs()
+		resolver.lookupNs = func(host string) ([]*net.NS, error) {
+			spyCalls++
+			return NsLookupStub(host)
+		}
+
+		resolver.Resolve("example.com")
+		resolver.Resolve("sub.example.com")
+
+		assert.Equal(t, spyCalls, 1)
+	})
 }
 
 func newResolverWithStubs() *Resolver {
