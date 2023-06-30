@@ -51,8 +51,7 @@ func newStrandedCommand() *cobra.Command {
 				return fmt.Errorf("error while getting apps: %w", err)
 			}
 
-			var domainToStatus map[string]int
-			domainToStatus = make(map[string]int)
+			var appDomains []AppDomainStatus
 
 			var cfResolver *dns.CloudflareResolver
 			if CloudflareCredentials != "" {
@@ -64,27 +63,28 @@ func newStrandedCommand() *cobra.Command {
 			// Loop through each domain, and check if it resolves to the server
 			for _, app := range apps {
 				for _, domain := range app.Domains {
-					status := dnsChecker.CheckStatus(domain, getServerIpForApp(app, s))
+					serverForApp := getServerForApp(app, s)
 
-					domainToStatus[domain] = status
+					status := dnsChecker.CheckStatus(domain, serverForApp.Ipaddress)
+
+					appDomains = append(appDomains, AppDomainStatus{app.Id, domain, serverForApp.Name, status})
 				}
 			}
 
 			// Only print out the stranded apps by default, but allow the user to include unknown domains with a flag
-			var domainsToPrint map[string]int
-			domainsToPrint = make(map[string]int)
-			for domain, status := range domainToStatus {
-				if status == dns.STRANDED {
-					domainsToPrint[domain] = status
+			var filtered []AppDomainStatus
+			for _, appDomain := range appDomains {
+				if appDomain.Status == dns.STRANDED {
+					filtered = append(filtered, appDomain)
 				}
 
-				if IncludeUnkown && status == dns.UNKNOWN {
-					domainsToPrint[domain] = status
+				if IncludeUnkown && appDomain.Status == dns.UNKNOWN {
+					filtered = append(filtered, appDomain)
 				}
 			}
 
 			// Print out the stranded apps, with their status (STRANDED/PARTIAL/UNKNOWN)
-			printDomains(domainsToPrint)
+			printDomains(filtered)
 
 			return nil
 		},
@@ -98,22 +98,29 @@ func newStrandedCommand() *cobra.Command {
 	return cmd
 }
 
-func getServerIpForApp(app serverpilot.App, servers []serverpilot.Server) string {
+type AppDomainStatus struct {
+	AppId      string
+	Domain     string
+	ServerName string
+	Status     int
+}
+
+func getServerForApp(app serverpilot.App, servers []serverpilot.Server) serverpilot.Server {
 	for _, server := range servers {
 		if server.Id == app.Serverid {
-			return server.Ipaddress
+			return server
 		}
 	}
 
-	return ""
+	return serverpilot.Server{}
 }
 
-func printDomains(domains map[string]int) {
+func printDomains(domains []AppDomainStatus) {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-	fmt.Fprintln(w, "DOMAIN\tSTATUS\t")
-	for domain, status := range domains {
+	fmt.Fprintln(w, "APP ID\tDOMAIN\tSERVER\tSTATUS\t")
+	for _, domain := range domains {
 		stringStatus := ""
-		switch status {
+		switch domain.Status {
 		case dns.OK:
 			stringStatus = "ok"
 		case dns.STRANDED:
@@ -121,7 +128,7 @@ func printDomains(domains map[string]int) {
 		case dns.UNKNOWN:
 			stringStatus = "unknown"
 		}
-		fmt.Fprintln(w, domain+"\t"+stringStatus+"\t")
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t\n", domain.AppId, domain.Domain, domain.ServerName, stringStatus)
 	}
 	w.Flush()
 }
