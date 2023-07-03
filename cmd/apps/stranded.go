@@ -7,6 +7,7 @@ import (
 	"github.com/jfortunato/serverpilot-tools/internal/http"
 	"github.com/jfortunato/serverpilot-tools/internal/serverpilot"
 	"github.com/jfortunato/serverpilot-tools/internal/servers"
+	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/cobra"
 	"io"
 	"log"
@@ -51,14 +52,16 @@ func newStrandedCommand() *cobra.Command {
 				return fmt.Errorf("error while getting apps: %w", err)
 			}
 
-			var appDomains []AppDomainStatus
-
 			var cfResolver *dns.CloudflareResolver
 			if CloudflareCredentials != "" {
 				creds := strings.Split(CloudflareCredentials, ":")
 				cfResolver = dns.NewCloudflareResolver(logger, http.NewClient(logger), &dns.Credentials{creds[0], creds[1]}, nil)
 			}
 			dnsChecker := dns.NewDnsChecker(dns.NewResolver(cfResolver, nil, nil, logger))
+
+			bar := progressbar.Default(int64(len(apps)))
+
+			var appDomains []AppDomainStatus
 
 			// Loop through each domain, and check if it resolves to the server
 			for _, app := range apps {
@@ -69,7 +72,10 @@ func newStrandedCommand() *cobra.Command {
 
 					appDomains = append(appDomains, AppDomainStatus{app.Id, domain, serverForApp.Name, status})
 				}
+				bar.Add(1)
 			}
+
+			bar.Clear()
 
 			// Only print out the stranded apps by default, but allow the user to include unknown domains with a flag
 			var filtered []AppDomainStatus
