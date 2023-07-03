@@ -52,6 +52,16 @@ func TestResolver(t *testing.T) {
 		}
 	})
 
+	t.Run("it should return an error when the domain is behind cloudflare but no cloudflare resolver has been setup", func(t *testing.T) {
+		resolver := newResolverWithStubs()
+		resolver.cfResolver = nil
+
+		got, err := resolver.Resolve("domain-behind-cloudflare.com")
+
+		assert.Assert(t, got == nil)
+		assert.ErrorIs(t, err, ErrorDomainBehindCloudFlare)
+	})
+
 	t.Run("it should check the base domains nameservers when resolving a subdomain", func(t *testing.T) {
 		var tests = []struct {
 			name   string
@@ -91,7 +101,7 @@ func TestResolver(t *testing.T) {
 
 func newResolverWithStubs() *Resolver {
 	return NewResolver(
-		&IpResolverStub{},
+		nil,
 		IpLookupStub,
 		NsLookupStub,
 		log.New(io.Discard, "", 0),

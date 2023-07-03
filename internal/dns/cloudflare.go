@@ -19,11 +19,11 @@ const PerPage = 50
 
 // CloudflareResolver is a DNS resolver that uses the Cloudflare API to resolve DNS records.
 type CloudflareResolver struct {
-	l              *log.Logger
-	c              http.CachingRateLimitedClient
-	creds          *Credentials
-	nameservers    []string
-	cachedRecoreds []DnsRecord
+	l           *log.Logger
+	parent      IpResolver
+	c           http.CachingRateLimitedClient
+	creds       *Credentials
+	nameservers []string
 }
 
 // Credentials are the credentials used to authenticate with the Cloudflare API.
@@ -70,29 +70,30 @@ type CloudflareResponse[T any] struct {
 
 // NewCloudflareResolver creates a new CloudflareResolver. Caching and rate limiting of the API requests is handled by the http.CachingRateLimitedClient.
 // The nameservers are used to determine if the domain is managed by the Cloudflare account that we have credentials for.
-func NewCloudflareResolver(l *log.Logger, c http.CachingRateLimitedClient, creds *Credentials, nameservers []string) *CloudflareResolver {
-	return &CloudflareResolver{l: l, c: c, creds: creds, nameservers: nameservers}
+func NewCloudflareResolver(l *log.Logger, parent IpResolver, c http.CachingRateLimitedClient, creds *Credentials, nameservers []string) *CloudflareResolver {
+	return &CloudflareResolver{l: l, parent: parent, c: c, creds: creds, nameservers: nameservers}
 }
 
 // Resolve resolves the domain using the Cloudflare API. It implements the IpResolver interface.
-// We cache the DNS records, even though the http requests are also cached by the http.CachingRateLimitedClient, because
-// it's faster to read from memory than to read from disk.
 func (r *CloudflareResolver) Resolve(domain string) ([]string, error) {
 	if r.creds == nil {
 		return nil, fmt.Errorf("%w: no credentials provided", ErrCouldNotMakeRequest)
 	}
 
-	// Get all DNS records for the account, and cache them
-	if r.cachedRecoreds == nil {
-		r.cachedRecoreds = r.getDnsRecords()
+	zone, err := r.getZoneForDomain(domain)
+	if err != nil {
+		return nil, err
 	}
 
-	records := r.cachedRecoreds
+	records, err := r.getDnsRecordsForZone(zone)
+	if err != nil {
+		return nil, err
+	}
 
-	return findMatchingRecord(domain, records), nil
+	return r.findMatchingRecord(domain, records)
 }
 
-func findMatchingRecord(domain string, records []DnsRecord) []string {
+func (r *CloudflareResolver) findMatchingRecord(domain string, records []DnsRecord) ([]string, error) {
 	var matched []string
 
 	// Find the DNS record for the domain
@@ -109,7 +110,12 @@ func findMatchingRecord(domain string, records []DnsRecord) []string {
 			if record.Type == "CNAME" {
 				target := record.Content
 
-				return findMatchingRecord(target, records)
+				// If the target is for the same base domain, then re-check the records for a matching A record
+				if getBaseDomain(target) == getBaseDomain(domain) {
+					return r.findMatchingRecord(target, records)
+				}
+
+				return r.parent.Resolve(target)
 			}
 
 			if record.Type == "A" {
@@ -118,39 +124,29 @@ func findMatchingRecord(domain string, records []DnsRecord) []string {
 		}
 	}
 
-	return matched
+	return matched, nil
 }
 
-func (r *CloudflareResolver) getDnsRecords() []DnsRecord {
-	records, err := r.getDnsRecordsForAllZones()
+func (r *CloudflareResolver) getZoneForDomain(domain string) (Zone, error) {
+	baseDomain := getBaseDomain(domain)
+	endpoint := "https://api.cloudflare.com/client/v4/zones?name=" + baseDomain
+	request := r.makeCloudflareRequest(endpoint)
+	contents, err := r.c.GetFromCacheOrFetchWithRateLimit(request)
 	if err != nil {
-		r.l.Printf("%s", fmt.Errorf("%w: %s", ErrCouldNotMakeRequest, err))
-		return nil
+		return Zone{}, err
 	}
-
-	return records
-}
-
-func (r *CloudflareResolver) getDnsRecordsForAllZones() ([]DnsRecord, error) {
-	zones, err := r.getZones()
+	cloudflareResponse := CloudflareResponse[[]Zone]{}
+	// Unmarshal the response into a CloudflareResponse
+	err = json.Unmarshal([]byte(contents), &cloudflareResponse)
 	if err != nil {
-		return nil, err
+		return Zone{}, fmt.Errorf("error while unmarshalling response body: %s", err)
 	}
 
-	var records []DnsRecord
-
-	for _, zone := range zones {
-		recordsForZone, err := r.getDnsRecordsForZone(zone)
-		if err != nil {
-			return nil, err
-		}
-
-		for _, record := range recordsForZone {
-			records = append(records, record)
-		}
+	if len(cloudflareResponse.Result) > 0 {
+		return cloudflareResponse.Result[0], nil
 	}
 
-	return records, nil
+	return Zone{}, fmt.Errorf("no zone found for domain %s", domain)
 }
 
 func (r *CloudflareResolver) makeCloudflareRequest(url string) http.Request {

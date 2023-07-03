@@ -12,9 +12,7 @@ import (
 
 func TestCloudflare(t *testing.T) {
 	t.Run("it should not be able to resolve a domain behind CloudFlare nameservers that we don't have api credentials for", func(t *testing.T) {
-		clientStub := &ClientStub{}
-
-		resolver := NewCloudflareResolver(log.New(io.Discard, "", 0), clientStub, nil, nil)
+		resolver := newCloudflareResolverWithStubs()
 
 		got, _ := resolver.Resolve("domain-behind-cloudflare.com")
 
@@ -90,16 +88,15 @@ func TestCloudflare(t *testing.T) {
 		}
 
 		// These tests will always use the same zone response
-		stubbedZoneResponses := makeStubbedZoneResponse("https://api.cloudflare.com/client/v4/zones?page=1&per_page=50", []Zone{{"1"}})
+		stubbedZoneResponses := makeStubbedZoneResponse("https://api.cloudflare.com/client/v4/zones?name=example.com", []Zone{{"1"}})
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				stubbedDnsResponses := makeStubbedDnsResponse("https://api.cloudflare.com/client/v4/zones/1/dns_records?page=1&per_page=50", tt.records)
 
+				resolver := newCloudflareResolverWithStubs()
 				// Combine the two responses into a single map
-				clientStub := &ClientStub{responses: combineResponses(stubbedZoneResponses, stubbedDnsResponses)}
-
-				resolver := NewCloudflareResolver(log.New(io.Discard, "", 0), clientStub, &Credentials{"foo", "bar"}, []string{"foo.ns.cloudflare.com", "bar.ns.cloudflare.com"})
+				resolver.c = &ClientStub{responses: combineResponses(stubbedZoneResponses, stubbedDnsResponses)}
 
 				got, _ := resolver.Resolve(tt.domain)
 
@@ -108,31 +105,45 @@ func TestCloudflare(t *testing.T) {
 		}
 	})
 
-	t.Run("it should return nil when any http error is encountered", func(t *testing.T) {
-		clientStub := &ClientStub{errStub: errors.New("http error")}
+	t.Run("it should return an error when no zone is found for the base domain", func(t *testing.T) {
+		stubbedZoneResponse := makeStubbedZoneResponse("https://api.cloudflare.com/client/v4/zones?name=example.com", []Zone{})
 
-		resolver := NewCloudflareResolver(log.New(io.Discard, "", 0), clientStub, &Credentials{"foo", "bar"}, []string{"foo.ns.cloudflare.com", "bar.ns.cloudflare.com"})
+		resolver := newCloudflareResolverWithStubs()
+		resolver.c = &ClientStub{responses: stubbedZoneResponse}
+
+		got, err := resolver.Resolve("example.com")
+
+		assert.Assert(t, got == nil)
+		assert.ErrorContains(t, err, "no zone found for domain")
+	})
+
+	t.Run("it should resolve the dns for a cname not within the same zone", func(t *testing.T) {
+		stubbedZoneResponses := makeStubbedZoneResponse("https://api.cloudflare.com/client/v4/zones?name=example.com", []Zone{{"1"}})
+
+		stubbedDnsResponses := makeStubbedDnsResponse("https://api.cloudflare.com/client/v4/zones/1/dns_records?page=1&per_page=50", []DnsRecord{
+			{"CNAME", "www.example.com", "other-host.com"},
+		})
+
+		resolver := newCloudflareResolverWithStubs()
+		// Combine the two responses into a single map
+		resolver.c = &ClientStub{responses: combineResponses(stubbedZoneResponses, stubbedDnsResponses)}
+		// Defer to the parent resolver for the ip of the cname
+		resolver.parent = &IpResolverStub{ips: map[string]string{
+			"other-host.com": "127.0.0.8",
+		}}
+
+		got, _ := resolver.Resolve("www.example.com")
+
+		assert.DeepEqual(t, got, []string{"127.0.0.8"})
+	})
+
+	t.Run("it should return nil when any http error is encountered", func(t *testing.T) {
+		resolver := newCloudflareResolverWithStubs()
+		resolver.c = &ClientStub{errStub: errors.New("http error")}
 
 		got, _ := resolver.Resolve("example.com")
 
 		assert.Assert(t, got == nil)
-	})
-
-	t.Run("it should cache the dns records in memory", func(t *testing.T) {
-		// Combine the two responses into a single map
-		clientStub := &ClientStub{responses: combineResponses(
-			makeStubbedZoneResponse("https://api.cloudflare.com/client/v4/zones?page=1&per_page=50", []Zone{{"1"}}),
-			makeStubbedDnsResponse("https://api.cloudflare.com/client/v4/zones/1/dns_records?page=1&per_page=50", []DnsRecord{{"A", "example.com", "127.0.0.1"}}),
-		)}
-
-		resolver := NewCloudflareResolver(log.New(io.Discard, "", 0), clientStub, &Credentials{"foo", "bar"}, []string{"foo.ns.cloudflare.com", "bar.ns.cloudflare.com"})
-
-		_, _ = resolver.Resolve("example.com")
-		_, _ = resolver.Resolve("example.com")
-
-		// Each Resolve call should result in 2 api requests (one for the zone, one for the dns records)
-		// The second call should not result in any api requests.
-		assert.Equal(t, clientStub.calls, 2)
 	})
 
 	t.Run("it should not attempt an api request if the credentials dont match the nameservers", func(t *testing.T) {
@@ -177,6 +188,16 @@ func makeStubbedDnsResponse(endpoint string, records []DnsRecord) map[string]str
 	j, _ := json.Marshal(response)
 
 	return map[string]string{endpoint: string(j)}
+}
+
+func newCloudflareResolverWithStubs() *CloudflareResolver {
+	return NewCloudflareResolver(
+		log.New(io.Discard, "", 0),
+		&IpResolverStub{},
+		&ClientStub{},
+		&Credentials{"foo", "bar"},
+		[]string{"foo.ns.cloudflare.com", "bar.ns.cloudflare.com"},
+	)
 }
 
 func combineResponses(responses ...map[string]string) map[string]string {

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/jfortunato/serverpilot-tools/internal/dns"
 	"github.com/jfortunato/serverpilot-tools/internal/filter"
-	"github.com/jfortunato/serverpilot-tools/internal/http"
 	"github.com/jfortunato/serverpilot-tools/internal/serverpilot"
 	"github.com/jfortunato/serverpilot-tools/internal/servers"
 	"github.com/schollz/progressbar/v3"
@@ -52,12 +51,13 @@ func newStrandedCommand() *cobra.Command {
 				return fmt.Errorf("error while getting apps: %w", err)
 			}
 
-			var cfResolver *dns.CloudflareResolver
+			var creds *dns.Credentials
 			if CloudflareCredentials != "" {
-				creds := strings.Split(CloudflareCredentials, ":")
-				cfResolver = dns.NewCloudflareResolver(logger, http.NewClient(logger), &dns.Credentials{creds[0], creds[1]}, nil)
+				split := strings.Split(CloudflareCredentials, ":")
+				creds = &dns.Credentials{split[0], split[1]}
 			}
-			dnsChecker := dns.NewDnsChecker(dns.NewResolver(cfResolver, nil, nil, logger))
+
+			dnsChecker := dns.NewDnsChecker(dns.NewResolver(creds, nil, nil, logger))
 
 			bar := progressbar.Default(int64(len(apps)))
 

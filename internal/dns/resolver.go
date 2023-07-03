@@ -1,10 +1,16 @@
 package dns
 
 import (
+	"errors"
+	"github.com/jfortunato/serverpilot-tools/internal/http"
 	"golang.org/x/net/publicsuffix"
 	"log"
 	"net"
 	"strings"
+)
+
+var (
+	ErrorDomainBehindCloudFlare = errors.New("domain is behind CloudFlare")
 )
 
 type Resolver struct {
@@ -18,7 +24,7 @@ type Resolver struct {
 type IpLookupFunc func(host string) ([]net.IP, error)
 type NsLookupFunc func(host string) ([]*net.NS, error)
 
-func NewResolver(cfResolver IpResolver, ipLookup IpLookupFunc, nsLookup NsLookupFunc, l *log.Logger) *Resolver {
+func NewResolver(creds *Credentials, ipLookup IpLookupFunc, nsLookup NsLookupFunc, l *log.Logger) *Resolver {
 	// Default to net.LookupIP
 	if ipLookup == nil {
 		ipLookup = net.LookupIP
@@ -29,13 +35,29 @@ func NewResolver(cfResolver IpResolver, ipLookup IpLookupFunc, nsLookup NsLookup
 		nsLookup = net.LookupNS
 	}
 
-	return &Resolver{cfResolver: cfResolver, lookupIp: ipLookup, lookupNs: nsLookup, l: l}
+	resolver := &Resolver{lookupIp: ipLookup, lookupNs: nsLookup, l: l}
+
+	// If we have CloudFlare API credentials, create a CloudFlare resolver.
+	if creds != nil {
+		resolver.cfResolver = NewCloudflareResolver(
+			l,
+			resolver,
+			http.NewClient(l),
+			creds,
+			nil,
+		)
+	}
+
+	return resolver
 }
 
 func (r *Resolver) Resolve(domain string) ([]string, error) {
 	// If the domain is behind CloudFlare, we won't be able to resolve the real IP addresses unless
 	// we have CloudFlare API credentials for the domain.
 	if r.isBehindCloudFlare(getBaseDomain(domain)) {
+		if r.cfResolver == nil {
+			return nil, ErrorDomainBehindCloudFlare
+		}
 		return r.cfResolver.Resolve(domain)
 	}
 
@@ -64,7 +86,11 @@ func (r *Resolver) isBehindCloudFlare(domain string) bool {
 		r.l.Println("Nameservers for", domain, "are", nsStrings)
 
 		// Cache the nameservers for this domain
-		r.cachedNs = map[string][]string{domain: nsStrings}
+		// Initialize the map if it's nil
+		if r.cachedNs == nil {
+			r.cachedNs = make(map[string][]string)
+		}
+		r.cachedNs[domain] = nsStrings
 	}
 
 	ns := r.cachedNs[domain]
