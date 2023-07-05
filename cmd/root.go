@@ -8,13 +8,21 @@ import (
 	"os"
 )
 
+type VersionDetails struct {
+	Version string
+	Commit  string
+	Date    string
+}
+
 var rootCmd = &cobra.Command{
 	Use:   "serverpilot-tools",
 	Short: "A collection of tools for ServerPilot.io",
 	Long:  `A collection of tools for ServerPilot.io`,
 }
 
-func Execute() {
+func Execute(v VersionDetails) {
+	rootCmd.Version = v.Version
+
 	rootCmd.AddCommand(
 		apps.NewAppsCommand(),
 		servers.NewServersCommand(),
