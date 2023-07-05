@@ -16,7 +16,7 @@ import (
 )
 
 var Verbose bool
-var IncludeUnkown bool
+var IncludeUnknown bool
 var CloudflareCredentials string
 
 func newStrandedCommand() *cobra.Command {
@@ -84,7 +84,7 @@ func newStrandedCommand() *cobra.Command {
 					filtered = append(filtered, appDomain)
 				}
 
-				if IncludeUnkown && appDomain.Status == dns.UNKNOWN {
+				if IncludeUnknown && appDomain.Status == dns.UNKNOWN {
 					filtered = append(filtered, appDomain)
 				}
 			}
@@ -98,7 +98,7 @@ func newStrandedCommand() *cobra.Command {
 
 	flags := cmd.Flags()
 	flags.BoolVarP(&Verbose, "verbose", "v", false, "Verbose output")
-	flags.BoolVarP(&IncludeUnkown, "include-unknown", "u", false, "Include domains with unknown status")
+	flags.BoolVarP(&IncludeUnknown, "include-unknown", "u", false, "Include domains with unknown status")
 	flags.StringVarP(&CloudflareCredentials, "cloudflare-credentials", "", "", "Cloudflare credentials (email:api-key)")
 
 	return cmd
