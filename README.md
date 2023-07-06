@@ -45,13 +45,13 @@ serverpilot-tools apps list <client_id> <api_key> --max-runtime php8.0
 Only show apps that are **known** to be inactive. This checks public DNS records to see if they are pointed at the server, but won't be able to resolve records behind a proxy. (i.e. DNS is managed by Cloudflare)
 
 ```shell
-serverpilot-tools apps stranded <client_id> <api_key>
+serverpilot-tools apps inactive <client_id> <api_key>
 ```
 
 To resolve DNS records behind CloudFlare, you can provide your CloudFlare api keys via the `cloudflare-credentials` option. This will use the CloudFlare API to resolve DNS records. (Only 1 CloudFlare account is supported at this time.)
 
 ```shell
-serverpilot-tools apps stranded <client_id> <api_key> --cloudflare-credentials "foo@example.com:1234567890abcdef1234567890abcdef"
+serverpilot-tools apps inactive <client_id> <api_key> --cloudflare-credentials "foo@example.com:1234567890abcdef1234567890abcdef"
 ```
 
 ## Downloads

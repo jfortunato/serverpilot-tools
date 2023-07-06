@@ -25,13 +25,13 @@ func TestDNS(t *testing.T) {
 				OK,
 			},
 			{
-				"stranded",
-				"stranded.example.com",
+				"inactive",
+				"inactive.example.com",
 				"127.0.0.1",
 				map[string]string{
-					"stranded.example.com": "0.0.0.0",
+					"inactive.example.com": "0.0.0.0",
 				},
-				STRANDED,
+				INACTIVE,
 			},
 			{
 				"unknown",
@@ -45,7 +45,7 @@ func TestDNS(t *testing.T) {
 				"expired.com",
 				"127.0.0.1",
 				map[string]string{},
-				STRANDED,
+				INACTIVE,
 			},
 		}
 

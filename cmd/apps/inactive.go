@@ -19,11 +19,11 @@ var Verbose bool
 var IncludeUnknown bool
 var CloudflareCredentials string
 
-func newStrandedCommand() *cobra.Command {
+func newInactiveCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "stranded [OPTIONS]",
+		Use:   "inactive [OPTIONS]",
 		Short: "Check for inactive (stranded) apps",
-		Long: `Check for inactive (stranded) apps. An app is considered stranded
+		Long: `Check for inactive (stranded) apps. An app is considered inactive
   if it exists on the server but does not have DNS records pointing to it.
   This makes it easy to find apps that are no longer in use or have migrated
   away and can be deleted.`,
@@ -77,10 +77,10 @@ func newStrandedCommand() *cobra.Command {
 
 			bar.Clear()
 
-			// Only print out the stranded apps by default, but allow the user to include unknown domains with a flag
+			// Only print out the inactive apps by default, but allow the user to include unknown domains with a flag
 			var filtered []AppDomainStatus
 			for _, appDomain := range appDomains {
-				if appDomain.Status == dns.STRANDED {
+				if appDomain.Status == dns.INACTIVE {
 					filtered = append(filtered, appDomain)
 				}
 
@@ -89,7 +89,7 @@ func newStrandedCommand() *cobra.Command {
 				}
 			}
 
-			// Print out the stranded apps, with their status (STRANDED/PARTIAL/UNKNOWN)
+			// Print out the inactive apps, with their status (INACTIVE/PARTIAL/UNKNOWN)
 			printDomains(filtered)
 
 			return nil
@@ -129,8 +129,8 @@ func printDomains(domains []AppDomainStatus) {
 		switch domain.Status {
 		case dns.OK:
 			stringStatus = "ok"
-		case dns.STRANDED:
-			stringStatus = "stranded"
+		case dns.INACTIVE:
+			stringStatus = "inactive"
 		case dns.UNKNOWN:
 			stringStatus = "unknown"
 		}

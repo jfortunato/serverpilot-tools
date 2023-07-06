@@ -2,7 +2,7 @@ package dns
 
 const (
 	OK int = iota
-	STRANDED
+	INACTIVE
 	UNKNOWN
 )
 
@@ -26,7 +26,7 @@ func (c *DnsChecker) CheckStatus(domain string, serverIp string) int {
 		}
 	}
 
-	return STRANDED
+	return INACTIVE
 }
 
 // IpResolver is an interface for resolving a domain to its IP address(s). It will return
