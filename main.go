@@ -3,9 +3,8 @@ package main
 import "github.com/jfortunato/serverpilot-tools/cmd"
 
 var (
-	version = "dev"
-	commit  = "none"
-	date    = "unknown"
+	commit = "none"
+	date   = "unknown"
 )
 
 func main() {

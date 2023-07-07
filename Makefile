@@ -1,4 +1,4 @@
-VERSION = $(shell cat VERSION | cut -d' ' -f1)
+VERSION = $(shell grep -Po 'v[0-9]+\.[0-9]+\.[0-9]+' version.go)
 GITCOMMIT=$(shell git rev-parse --short HEAD)
 BUILDTIME=$(shell date -u --iso-8601=seconds)
 
@@ -6,7 +6,6 @@ BUILDTIME=$(shell date -u --iso-8601=seconds)
 GO_LDFLAGS = -s -w
 
 # Add some build information
-GO_LDFLAGS += -X 'main.version=$(VERSION)'
 GO_LDFLAGS += -X 'main.commit=$(GITCOMMIT)'
 GO_LDFLAGS += -X 'main.date=$(BUILDTIME)'
 
