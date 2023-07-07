@@ -24,12 +24,13 @@ func TestResolver(t *testing.T) {
 
 	t.Run("it should defer to the cloudflare resolver when the domain is on cloudflare nameservers", func(t *testing.T) {
 		var tests = []struct {
-			domain         string
-			stubbedResult  string
-			expectedResult []string
+			domain             string
+			isBehindCloudflare bool
+			stubbedResult      string
+			expectedResult     []string
 		}{
-			{"domain-behind-cloudflare.com", "", nil},
-			{"domain-behind-cloudflare.com", "127.0.0.1", []string{"127.0.0.1"}},
+			{"domain-behind-cloudflare.com", true, "", nil},
+			{"domain-behind-cloudflare.com", true, "127.0.0.1", []string{"127.0.0.1"}},
 		}
 
 		for _, tt := range tests {
@@ -43,7 +44,7 @@ func TestResolver(t *testing.T) {
 				} else {
 					stub = map[string]string{tt.domain: tt.stubbedResult}
 				}
-				resolver.cfResolver = &IpResolverStub{stub}
+				resolver.cfResolver = &CloudflareResolverStub{IpResolverStub: &IpResolverStub{ips: stub}, isBehindCloudflare: tt.isBehindCloudflare}
 
 				got, _ := resolver.Resolve(tt.domain)
 
@@ -52,60 +53,32 @@ func TestResolver(t *testing.T) {
 		}
 	})
 
-	t.Run("it should return an error when the domain is behind cloudflare but no cloudflare resolver has been setup", func(t *testing.T) {
+	t.Run("it should return an error when the domain is behind cloudflare but the cloudflare resolver cannot resolve", func(t *testing.T) {
 		resolver := newResolverWithStubs()
-		resolver.cfResolver = nil
+		resolver.cfResolver = &CloudflareResolverStub{&IpResolverStub{}, true}
 
 		got, err := resolver.Resolve("domain-behind-cloudflare.com")
 
 		assert.Assert(t, got == nil)
 		assert.ErrorIs(t, err, ErrorDomainBehindCloudFlare)
 	})
-
-	t.Run("it should check the base domains nameservers when resolving a subdomain", func(t *testing.T) {
-		var tests = []struct {
-			name   string
-			domain string
-			want   []string
-		}{
-			{"subdomain with base domain behind cloudflare", "sub.domain-behind-cloudflare.com", nil},
-			{"subdomain with base domain not behind cloudflare", "sub.example.com", []string{"127.0.0.2"}},
-			{"subdomain with 2 dots in TLD", "sub.example.co.uk", []string{"127.0.0.3"}},
-		}
-
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				resolver := newResolverWithStubs()
-
-				got, _ := resolver.Resolve(tt.domain)
-
-				assert.DeepEqual(t, got, tt.want)
-			})
-		}
-	})
-
-	t.Run("it should cache nameserver lookups for the base domain", func(t *testing.T) {
-		spyCalls := 0
-		resolver := newResolverWithStubs()
-		resolver.lookupNs = func(host string) ([]*net.NS, error) {
-			spyCalls++
-			return NsLookupStub(host)
-		}
-
-		resolver.Resolve("example.com")
-		resolver.Resolve("sub.example.com")
-
-		assert.Equal(t, spyCalls, 1)
-	})
 }
 
 func newResolverWithStubs() *Resolver {
 	return NewResolver(
-		nil,
+		&CloudflareResolverStub{&IpResolverStub{}, false},
 		IpLookupStub,
-		NsLookupStub,
 		log.New(io.Discard, "", 0),
 	)
+}
+
+type CloudflareResolverStub struct {
+	*IpResolverStub
+	isBehindCloudflare bool
+}
+
+func (r *CloudflareResolverStub) IsBehindCloudFlare(domain string) bool {
+	return r.isBehindCloudflare
 }
 
 func IpLookupStub(host string) ([]net.IP, error) {

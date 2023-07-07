@@ -7,6 +7,7 @@ import (
 	"gotest.tools/v3/assert"
 	"io"
 	"log"
+	"net"
 	"testing"
 )
 
@@ -148,6 +149,42 @@ func TestCloudflare(t *testing.T) {
 
 	t.Run("it should not attempt an api request if the credentials dont match the nameservers", func(t *testing.T) {
 	})
+
+	t.Run("it should check the base domains nameservers when resolving a subdomain", func(t *testing.T) {
+		var tests = []struct {
+			name   string
+			domain string
+			want   bool
+		}{
+			{"subdomain with base domain behind cloudflare", "sub.domain-behind-cloudflare.com", true},
+			{"subdomain with base domain not behind cloudflare", "sub.example.com", false},
+			{"subdomain with 2 dots in TLD", "sub.example.co.uk", false},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				resolver := newCloudflareResolverWithStubs()
+
+				got := resolver.IsBehindCloudFlare(tt.domain)
+
+				assert.DeepEqual(t, got, tt.want)
+			})
+		}
+	})
+
+	t.Run("it should cache nameserver lookups for the base domain", func(t *testing.T) {
+		spyCalls := 0
+		resolver := newCloudflareResolverWithStubs()
+		resolver.lookupNs = func(host string) ([]*net.NS, error) {
+			spyCalls++
+			return NsLookupStub(host)
+		}
+
+		resolver.IsBehindCloudFlare("example.com")
+		resolver.IsBehindCloudFlare("sub.example.com")
+
+		assert.Equal(t, spyCalls, 1)
+	})
 }
 
 func makeStubbedZoneResponse(endpoint string, zones []Zone) map[string]string {
@@ -197,6 +234,7 @@ func newCloudflareResolverWithStubs() *CloudflareResolver {
 		&ClientStub{},
 		&Credentials{"foo", "bar"},
 		[]string{"foo.ns.cloudflare.com", "bar.ns.cloudflare.com"},
+		NsLookupStub,
 	)
 }
 

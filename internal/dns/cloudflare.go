@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/jfortunato/serverpilot-tools/internal/http"
 	"log"
+	"net"
 	"regexp"
 	"strings"
 )
@@ -24,6 +25,8 @@ type CloudflareResolver struct {
 	c           http.CachingRateLimitedClient
 	creds       *Credentials
 	nameservers []string
+	lookupNs    NsLookupFunc
+	cachedNs    map[string][]string
 }
 
 // Credentials are the credentials used to authenticate with the Cloudflare API.
@@ -70,8 +73,13 @@ type CloudflareResponse[T any] struct {
 
 // NewCloudflareResolver creates a new CloudflareResolver. Caching and rate limiting of the API requests is handled by the http.CachingRateLimitedClient.
 // The nameservers are used to determine if the domain is managed by the Cloudflare account that we have credentials for.
-func NewCloudflareResolver(l *log.Logger, parent IpResolver, c http.CachingRateLimitedClient, creds *Credentials, nameservers []string) *CloudflareResolver {
-	return &CloudflareResolver{l: l, parent: parent, c: c, creds: creds, nameservers: nameservers}
+func NewCloudflareResolver(l *log.Logger, parent IpResolver, c http.CachingRateLimitedClient, creds *Credentials, nameservers []string, nsLookup NsLookupFunc) *CloudflareResolver {
+	// Default to net.LookupNS
+	if nsLookup == nil {
+		nsLookup = net.LookupNS
+	}
+
+	return &CloudflareResolver{l: l, parent: parent, c: c, creds: creds, nameservers: nameservers, lookupNs: nsLookup}
 }
 
 // Resolve resolves the domain using the Cloudflare API. It implements the IpResolver interface.
@@ -91,6 +99,39 @@ func (r *CloudflareResolver) Resolve(domain string) ([]string, error) {
 	}
 
 	return r.findMatchingRecord(domain, records)
+}
+
+func (r *CloudflareResolver) IsBehindCloudFlare(domain string) bool {
+	baseDomain := getBaseDomain(domain)
+
+	// Check if we've already looked up the nameservers for this domain
+	if r.cachedNs == nil || r.cachedNs[baseDomain] == nil {
+		r.l.Println("Looking up nameservers for", baseDomain, "...")
+		ns, _ := r.lookupNs(baseDomain)
+		var nsStrings []string
+		for _, n := range ns {
+			nsStrings = append(nsStrings, n.Host)
+		}
+		r.l.Println("Nameservers for", baseDomain, "are", nsStrings)
+
+		// Cache the nameservers for this domain
+		// Initialize the map if it's nil
+		if r.cachedNs == nil {
+			r.cachedNs = make(map[string][]string)
+		}
+		r.cachedNs[baseDomain] = nsStrings
+	}
+
+	ns := r.cachedNs[baseDomain]
+
+	for _, n := range ns {
+		// Check if the nameserver format matches *.ns.cloudflare.com.
+		if len(n) >= 18 && n[len(n)-18:] == "ns.cloudflare.com." {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (r *CloudflareResolver) findMatchingRecord(domain string, records []DnsRecord) ([]string, error) {

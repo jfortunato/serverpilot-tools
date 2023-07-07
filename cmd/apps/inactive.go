@@ -138,8 +138,9 @@ func createDomainChecker(logger *log.Logger, cloudflareCreds string) *dns.DnsChe
 		split := strings.Split(cloudflareCreds, ":")
 		creds = &dns.Credentials{split[0], split[1]}
 	}
+	_ = creds
 
-	return dns.NewDnsChecker(dns.NewResolver(creds, nil, nil, logger))
+	return dns.NewDnsChecker(dns.NewResolver(nil, nil, logger))
 }
 
 type AppDomainStatus struct {
