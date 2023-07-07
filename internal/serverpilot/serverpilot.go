@@ -33,6 +33,11 @@ type Server struct {
 	Datecreated DateCreated `json:"datecreated"`
 }
 
+type AppServer struct {
+	App
+	Server Server
+}
+
 type AppResponse struct {
 	Data []App `json:"data"`
 }
