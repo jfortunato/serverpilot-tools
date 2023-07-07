@@ -11,6 +11,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"regexp"
 	"strings"
 	"text/tabwriter"
 )
@@ -32,9 +33,17 @@ func newInactiveCommand() *cobra.Command {
   This makes it easy to find apps that are no longer in use or have migrated
   away and can be deleted.`,
 		Args: cobra.ExactArgs(2),
-		//PreRunE: func(cmd *cobra.Command, args []string) error {
-		//	// Validate here?
-		//},
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			// Validate Cloudflare credentials, if provided
+			if options.cloudflareCredentials != "" {
+				re := regexp.MustCompile(`^(.+):(.+)$`)
+				if !re.MatchString(options.cloudflareCredentials) {
+					return fmt.Errorf("invalid Cloudflare credentials format")
+				}
+			}
+
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runInactive(args[0], args[1], options)
 		},
