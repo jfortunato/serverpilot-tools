@@ -329,7 +329,7 @@ func (c *CloudflareCredentialsChecker) PromptForCredentials(domains []string) []
 	validYesNoResponses := []string{"y", "Y", "n", "N"}
 
 	// The first thing we want it to say is the number of accounts detected, and ask if they want to enter credentials
-	response := c.p.Prompt(fmt.Sprintf("Detected %v CloudFlare account. Do you want to use the CloudFlare API to check DNS records? [y/N]", len(nameserverDomains)), "N", validYesNoResponses)
+	response := c.p.Prompt(fmt.Sprintf("Detected %v CloudFlare accounts. Do you want to use the CloudFlare API to check DNS records? [y/N]", len(nameserverDomains)), "N", validYesNoResponses)
 
 	// If they say no, then we should just return nil, nil
 	if response == "n" || response == "N" {
@@ -352,8 +352,7 @@ func (c *CloudflareCredentialsChecker) promptForCredentials(nsd NameserverDomain
 	validYesNoResponses := []string{"y", "Y", "n", "N"}
 
 	ns := strings.Join(nsd.Nameservers, ", ")
-	domains := strings.Join(nsd.Domains, ", ")
-	response := c.p.Prompt(fmt.Sprintf("Would you like to enter credentials for %s (domains: %s)? [y/N]", ns, domains), "N", validYesNoResponses)
+	response := c.p.Prompt(fmt.Sprintf("Would you like to enter credentials for %s (domains: %s)? [y/N]", ns, getDomainsText(nsd.Domains, 3)), "N", validYesNoResponses)
 
 	// If they say no, then we should just return nil, nil
 	if response == "n" || response == "N" {
@@ -364,6 +363,26 @@ func (c *CloudflareCredentialsChecker) promptForCredentials(nsd NameserverDomain
 	token := c.p.Prompt(fmt.Sprintf("API Token:"), "", nil)
 
 	return &Credentials{email, token}
+}
+
+func getDomainsText(domains []string, totalToShow int) string {
+	var firstFewDomains []string
+
+	if len(domains) > totalToShow {
+		firstFewDomains = domains[:totalToShow]
+	} else {
+		firstFewDomains = domains
+	}
+
+	totalRest := len(domains) - totalToShow
+
+	domainsText := strings.Join(firstFewDomains, ", ")
+
+	if totalRest > 0 {
+		domainsText = fmt.Sprintf("%s, and %d more", domainsText, totalRest)
+	}
+
+	return domainsText
 }
 
 func appendOrInitializeNameserverDomains(existing []NameserverDomains, nameservers []string, domain string) []NameserverDomains {
