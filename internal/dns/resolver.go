@@ -12,13 +12,14 @@ var (
 	ErrorDomainBehindCloudFlare = errors.New("domain is behind CloudFlare")
 )
 
-type cloudflareResolver interface {
-	IpResolver
+type cloudflareChecker interface {
 	IsBehindCloudFlare(domain string) bool
+	GetNameserversForBaseDomain(domain string) ([]string, error)
 }
 
 type Resolver struct {
-	cfResolver cloudflareResolver
+	cfResolver IpResolver
+	cfChecker  cloudflareChecker
 	lookupIp   IpLookupFunc
 	l          *log.Logger
 }
@@ -26,22 +27,20 @@ type Resolver struct {
 type IpLookupFunc func(host string) ([]net.IP, error)
 type NsLookupFunc func(host string) ([]*net.NS, error)
 
-func NewResolver(cfResolver cloudflareResolver, ipLookup IpLookupFunc, l *log.Logger) *Resolver {
+func NewResolver(cfResolver IpResolver, cfChecker cloudflareChecker, nsd []NameserverDomains, ipLookup IpLookupFunc, l *log.Logger) *Resolver {
 	// Default to net.LookupIP
 	if ipLookup == nil {
 		ipLookup = net.LookupIP
 	}
 
-	resolver := &Resolver{cfResolver: cfResolver, lookupIp: ipLookup, l: l}
+	resolver := &Resolver{cfResolver: cfResolver, cfChecker: cfChecker, lookupIp: ipLookup, l: l}
 
 	if cfResolver == nil {
 		resolver.cfResolver = NewCloudflareResolver(
 			l,
 			resolver,
 			http.NewClient(l),
-			nil,
-			nil,
-			net.LookupNS,
+			nsd,
 		)
 	}
 
@@ -51,7 +50,7 @@ func NewResolver(cfResolver cloudflareResolver, ipLookup IpLookupFunc, l *log.Lo
 func (r *Resolver) Resolve(domain string) ([]string, error) {
 	// If the domain is behind CloudFlare, we won't be able to resolve the real IP addresses unless
 	// we have CloudFlare API credentials for the domain.
-	if r.cfResolver.IsBehindCloudFlare(domain) {
+	if r.cfChecker.IsBehindCloudFlare(domain) {
 		resolved, err := r.cfResolver.Resolve(domain)
 		if err != nil {
 			return nil, fmt.Errorf("%w: cloudflare error", ErrorDomainBehindCloudFlare)

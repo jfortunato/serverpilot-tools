@@ -11,15 +11,12 @@ import (
 	"io"
 	"log"
 	"os"
-	"regexp"
-	"strings"
 	"text/tabwriter"
 )
 
 type inactiveOptions struct {
-	verbose               bool
-	includeUnknown        bool
-	cloudflareCredentials string
+	verbose        bool
+	includeUnknown bool
 }
 
 func newInactiveCommand() *cobra.Command {
@@ -34,14 +31,6 @@ func newInactiveCommand() *cobra.Command {
   away and can be deleted.`,
 		Args: cobra.ExactArgs(2),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			// Validate Cloudflare credentials, if provided
-			if options.cloudflareCredentials != "" {
-				re := regexp.MustCompile(`^(.+):(.+)$`)
-				if !re.MatchString(options.cloudflareCredentials) {
-					return fmt.Errorf("invalid Cloudflare credentials format")
-				}
-			}
-
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -52,14 +41,13 @@ func newInactiveCommand() *cobra.Command {
 	flags := cmd.Flags()
 	flags.BoolVarP(&options.verbose, "verbose", "v", false, "Verbose output")
 	flags.BoolVarP(&options.includeUnknown, "include-unknown", "u", false, "Include domains with unknown status")
-	flags.StringVarP(&options.cloudflareCredentials, "cloudflare-credentials", "", "", "Cloudflare credentials (email:api-key)")
 
 	return cmd
 }
 
 func runInactive(user, key string, options inactiveOptions) error {
 	logger := createLogger(options.verbose)
-	dnsChecker := createDomainChecker(logger, options.cloudflareCredentials)
+	cloudflareChecker := createCloudflareChecker(logger)
 
 	var appDomains []AppDomainStatus
 
@@ -67,6 +55,17 @@ func runInactive(user, key string, options inactiveOptions) error {
 	if err != nil {
 		return err
 	}
+
+	// Get all domains
+	domains := make([]string, 0)
+	for _, app := range apps {
+		for _, domain := range app.Domains {
+			domains = append(domains, domain)
+		}
+	}
+
+	nsd := cloudflareChecker.PromptForCredentials(domains)
+	dnsChecker := createDomainChecker(logger, cloudflareChecker, nsd)
 
 	bar := progressbar.Default(int64(len(apps)))
 
@@ -132,15 +131,12 @@ func createLogger(isVerbose bool) *log.Logger {
 	return logger
 }
 
-func createDomainChecker(logger *log.Logger, cloudflareCreds string) *dns.DnsChecker {
-	var creds *dns.Credentials
-	if cloudflareCreds != "" {
-		split := strings.Split(cloudflareCreds, ":")
-		creds = &dns.Credentials{split[0], split[1]}
-	}
-	_ = creds
+func createCloudflareChecker(logger *log.Logger) *dns.CloudflareCredentialsChecker {
+	return dns.NewCloudflareCredentialsChecker(logger, &dns.Prompter{}, nil)
+}
 
-	return dns.NewDnsChecker(dns.NewResolver(nil, nil, logger))
+func createDomainChecker(logger *log.Logger, checker *dns.CloudflareCredentialsChecker, nsd []dns.NameserverDomains) *dns.DnsChecker {
+	return dns.NewDnsChecker(dns.NewResolver(nil, checker, nsd, nil, logger))
 }
 
 type AppDomainStatus struct {

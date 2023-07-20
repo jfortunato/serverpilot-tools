@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"strings"
 	"testing"
 )
 
@@ -24,13 +25,12 @@ func TestResolver(t *testing.T) {
 
 	t.Run("it should defer to the cloudflare resolver when the domain is on cloudflare nameservers", func(t *testing.T) {
 		var tests = []struct {
-			domain             string
-			isBehindCloudflare bool
-			stubbedResult      string
-			expectedResult     []string
+			domain         string
+			stubbedResult  string
+			expectedResult []string
 		}{
-			{"domain-behind-cloudflare.com", true, "", nil},
-			{"domain-behind-cloudflare.com", true, "127.0.0.1", []string{"127.0.0.1"}},
+			{"domain-behind-cloudflare.com", "", nil},
+			{"domain-behind-cloudflare.com", "127.0.0.1", []string{"127.0.0.1"}},
 		}
 
 		for _, tt := range tests {
@@ -44,7 +44,7 @@ func TestResolver(t *testing.T) {
 				} else {
 					stub = map[string]string{tt.domain: tt.stubbedResult}
 				}
-				resolver.cfResolver = &CloudflareResolverStub{IpResolverStub: &IpResolverStub{ips: stub}, isBehindCloudflare: tt.isBehindCloudflare}
+				resolver.cfResolver = &IpResolverStub{ips: stub}
 
 				got, _ := resolver.Resolve(tt.domain)
 
@@ -55,7 +55,7 @@ func TestResolver(t *testing.T) {
 
 	t.Run("it should return an error when the domain is behind cloudflare but the cloudflare resolver cannot resolve", func(t *testing.T) {
 		resolver := newResolverWithStubs()
-		resolver.cfResolver = &CloudflareResolverStub{&IpResolverStub{}, true}
+		resolver.cfResolver = &IpResolverStub{}
 
 		got, err := resolver.Resolve("domain-behind-cloudflare.com")
 
@@ -66,28 +66,44 @@ func TestResolver(t *testing.T) {
 
 func newResolverWithStubs() *Resolver {
 	return NewResolver(
-		&CloudflareResolverStub{&IpResolverStub{}, false},
+		&IpResolverStub{},
+		&CloudflareCheckerStub{},
+		nil,
 		IpLookupStub,
 		log.New(io.Discard, "", 0),
 	)
 }
 
-type CloudflareResolverStub struct {
-	*IpResolverStub
-	isBehindCloudflare bool
+type CloudflareCheckerStub struct {
 }
 
-func (r *CloudflareResolverStub) IsBehindCloudFlare(domain string) bool {
-	return r.isBehindCloudflare
+func (c *CloudflareCheckerStub) IsBehindCloudFlare(domain string) bool {
+	ns, _ := c.GetNameserversForBaseDomain(domain)
+
+	return len(ns) > 0 && strings.HasSuffix(ns[0], "ns.cloudflare.com")
+}
+
+func (c *CloudflareCheckerStub) GetNameserversForBaseDomain(domain string) ([]string, error) {
+	ns, _ := NsLookupStub(getBaseDomain(domain))
+	var nameservers []string
+	for _, n := range ns {
+		// Remove trailing dot
+		host := strings.TrimSuffix(n.Host, ".")
+
+		nameservers = append(nameservers, host)
+	}
+
+	return nameservers, nil
 }
 
 func IpLookupStub(host string) ([]net.IP, error) {
 	known := map[string][]net.IP{
-		"example.com":                      {net.ParseIP("127.0.0.1")},
-		"sub.example.com":                  {net.ParseIP("127.0.0.2")},
-		"sub.example.co.uk":                {net.ParseIP("127.0.0.3")},
-		"domain-behind-cloudflare.com":     {net.ParseIP("1.1.1.1")},
-		"sub.domain-behind-cloudflare.com": {net.ParseIP("1.0.0.1")},
+		"example.com":                          {net.ParseIP("127.0.0.1")},
+		"sub.example.com":                      {net.ParseIP("127.0.0.2")},
+		"sub.example.co.uk":                    {net.ParseIP("127.0.0.3")},
+		"domain-behind-cloudflare.com":         {net.ParseIP("1.1.1.1")},
+		"sub.domain-behind-cloudflare.com":     {net.ParseIP("1.0.0.1")},
+		"another-domain-behind-cloudflare.com": {net.ParseIP("1.1.1.1")},
 	}
 
 	if ips, ok := known[host]; ok {
@@ -99,9 +115,10 @@ func IpLookupStub(host string) ([]net.IP, error) {
 
 func NsLookupStub(host string) ([]*net.NS, error) {
 	known := map[string][]*net.NS{
-		"example.com":                  {&net.NS{Host: "ns1.example.com."}},
-		"example.co.uk":                {&net.NS{Host: "ns1.example.co.uk."}},
-		"domain-behind-cloudflare.com": {&net.NS{Host: "foo.ns.cloudflare.com."}, &net.NS{Host: "bar.ns.cloudflare.com."}},
+		"example.com":                          {&net.NS{Host: "ns1.example.com."}},
+		"example.co.uk":                        {&net.NS{Host: "ns1.example.co.uk."}},
+		"domain-behind-cloudflare.com":         {&net.NS{Host: "foo.ns.cloudflare.com."}, &net.NS{Host: "bar.ns.cloudflare.com."}},
+		"another-domain-behind-cloudflare.com": {&net.NS{Host: "baz.ns.cloudflare.com."}, &net.NS{Host: "bing.ns.cloudflare.com."}},
 	}
 
 	if ns, ok := known[host]; ok {
