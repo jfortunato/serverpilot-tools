@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"github.com/jfortunato/serverpilot-tools/internal/dns"
 	"github.com/jfortunato/serverpilot-tools/internal/filter"
+	"github.com/jfortunato/serverpilot-tools/internal/progressbar"
 	"github.com/jfortunato/serverpilot-tools/internal/serverpilot"
 	"github.com/jfortunato/serverpilot-tools/internal/servers"
-	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/cobra"
 	"io"
 	"log"
@@ -49,8 +49,6 @@ func runInactive(user, key string, options inactiveOptions) error {
 	logger := createLogger(options.verbose)
 	cloudflareChecker := createCloudflareChecker(logger)
 
-	var appDomains []AppDomainStatus
-
 	apps, err := getAppServers(logger, user, key)
 	if err != nil {
 		return err
@@ -67,31 +65,12 @@ func runInactive(user, key string, options inactiveOptions) error {
 	nsd := cloudflareChecker.PromptForCredentials(domains)
 	dnsChecker := createDomainChecker(logger, cloudflareChecker, nsd)
 
-	bar := progressbar.Default(int64(len(apps)))
-
-	// Loop through each domain, and check if it resolves to the server
-	for _, app := range apps {
-		for _, domain := range app.Domains {
-			status := dnsChecker.CheckStatus(domain, app.Server.Ipaddress)
-
-			appDomains = append(appDomains, AppDomainStatus{app.Id, domain, app.Server.Name, status})
-		}
-		bar.Add(1)
-	}
-
-	bar.Clear()
+	bar := progressbar.NewProgressBar(len(apps))
 
 	// Only print out the inactive apps by default, but allow the user to include unknown domains with a flag
-	var filtered []AppDomainStatus
-	for _, appDomain := range appDomains {
-		if appDomain.Status == dns.INACTIVE {
-			filtered = append(filtered, appDomain)
-		}
+	filtered := dnsChecker.GetInactiveAppDomains(bar, apps, options.includeUnknown)
 
-		if options.includeUnknown && appDomain.Status == dns.UNKNOWN {
-			filtered = append(filtered, appDomain)
-		}
-	}
+	bar.Clear()
 
 	// Print out the inactive apps, with their status (INACTIVE/PARTIAL/UNKNOWN)
 	return printDomains(filtered)
@@ -139,13 +118,6 @@ func createDomainChecker(logger *log.Logger, checker *dns.CloudflareCredentialsC
 	return dns.NewDnsChecker(dns.NewResolver(nil, checker, nsd, nil, logger))
 }
 
-type AppDomainStatus struct {
-	AppId      string
-	Domain     string
-	ServerName string
-	Status     int
-}
-
 func getServerForApp(app serverpilot.App, servers []serverpilot.Server) serverpilot.Server {
 	for _, server := range servers {
 		if server.Id == app.Serverid {
@@ -156,7 +128,7 @@ func getServerForApp(app serverpilot.App, servers []serverpilot.Server) serverpi
 	return serverpilot.Server{}
 }
 
-func printDomains(domains []AppDomainStatus) error {
+func printDomains(domains []dns.AppDomainStatus) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 	fmt.Fprintln(w, "APP ID\tDOMAIN\tSERVER\tSTATUS\t")
 	for _, domain := range domains {
