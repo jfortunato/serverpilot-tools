@@ -4,6 +4,7 @@ import (
 	"github.com/jfortunato/serverpilot-tools/internal/progressbar"
 	"github.com/jfortunato/serverpilot-tools/internal/serverpilot"
 	"golang.org/x/net/publicsuffix"
+	"log"
 	"strings"
 )
 
@@ -63,6 +64,19 @@ func (c *DnsChecker) CheckStatus(domain string, serverIp string) int {
 	}
 
 	return INACTIVE
+}
+
+func PromptForCloudflareCredentials(l *log.Logger, appservers []serverpilot.AppServer) (*CloudflareCredentialsChecker, []NameserverDomains) {
+	c := NewCloudflareCredentialsChecker(l, &Prompter{}, nil)
+
+	// Get all the domains for the apps
+	var domains []string
+	for _, appserver := range appservers {
+		domains = append(domains, appserver.Domains...)
+	}
+
+	// Check which of the domains are using Cloudflare, and prompt for credentials
+	return c, c.PromptForCredentials(domains)
 }
 
 func getBaseDomain(domain string) string {

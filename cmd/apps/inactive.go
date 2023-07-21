@@ -47,22 +47,13 @@ func newInactiveCommand() *cobra.Command {
 
 func runInactive(user, key string, options inactiveOptions) error {
 	logger := createLogger(options.verbose)
-	cloudflareChecker := createCloudflareChecker(logger)
 
 	apps, err := getAppServers(logger, user, key)
 	if err != nil {
 		return err
 	}
 
-	// Get all domains
-	domains := make([]string, 0)
-	for _, app := range apps {
-		for _, domain := range app.Domains {
-			domains = append(domains, domain)
-		}
-	}
-
-	nsd := cloudflareChecker.PromptForCredentials(domains)
+	cloudflareChecker, nsd := dns.PromptForCloudflareCredentials(logger, apps)
 	dnsChecker := createDomainChecker(logger, cloudflareChecker, nsd)
 
 	bar := progressbar.NewProgressBar(len(apps))
@@ -108,10 +99,6 @@ func createLogger(isVerbose bool) *log.Logger {
 		logger.SetOutput(os.Stdout)
 	}
 	return logger
-}
-
-func createCloudflareChecker(logger *log.Logger) *dns.CloudflareCredentialsChecker {
-	return dns.NewCloudflareCredentialsChecker(logger, &dns.Prompter{}, nil)
 }
 
 func createDomainChecker(logger *log.Logger, checker *dns.CloudflareCredentialsChecker, nsd []dns.NameserverDomains) *dns.DnsChecker {
