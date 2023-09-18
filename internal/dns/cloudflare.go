@@ -31,6 +31,12 @@ type Credentials struct {
 	ApiToken string
 }
 
+// CloudflareDomainMetadata is the metadata for a domain that is required to resolve it using the Cloudflare API.
+type CloudflareDomainMetadata struct {
+	BaseDomainNameservers []string
+	CloudflareCredentials *Credentials
+}
+
 // Zone is a Cloudflare zone.
 type Zone struct {
 	Id string `json:"id"`
@@ -79,7 +85,7 @@ func NewCloudflareResolver(l *log.Logger, parent IpResolver, c http.CachingRateL
 
 // Resolve resolves the domain using the Cloudflare API. It implements the IpResolver interface.
 func (r *CloudflareResolver) Resolve(domain UnresolvedDomain) ([]string, error) {
-	creds := domain.CloudflareCredentials
+	creds := domain.CloudflareMetadata.CloudflareCredentials
 
 	if creds == nil {
 		return nil, fmt.Errorf("%w: no credentials provided", ErrCouldNotMakeRequest)
@@ -120,12 +126,7 @@ func (r *CloudflareResolver) findMatchingRecord(domain string, records []DnsReco
 					return r.findMatchingRecord(target, records)
 				}
 
-				return r.parent.Resolve(UnresolvedDomain{
-					Name:                  target,
-					IsBehindCloudflare:    false,
-					BaseDomainNameservers: nil,
-					CloudflareCredentials: nil,
-				})
+				return r.parent.Resolve(UnresolvedDomain{Name: target})
 			}
 
 			if record.Type == "A" {

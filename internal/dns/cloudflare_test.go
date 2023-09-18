@@ -16,8 +16,11 @@ func TestCloudflare(t *testing.T) {
 		resolver := newCloudflareResolverWithStubs()
 
 		got, _ := resolver.Resolve(UnresolvedDomain{
-			Name:                  "domain-behind-cloudflare.com",
-			CloudflareCredentials: nil,
+			Name: "domain-behind-cloudflare.com",
+			CloudflareMetadata: &CloudflareDomainMetadata{
+				BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+				CloudflareCredentials: nil,
+			},
 		})
 
 		assert.Assert(t, got == nil)
@@ -103,7 +106,10 @@ func TestCloudflare(t *testing.T) {
 				resolver.c = &ClientStub{responses: combineResponses(stubbedZoneResponses, stubbedDnsResponses)}
 
 				// We always want these test have credentials for the domain, so stub the domain with credentials
-				got, _ := resolver.Resolve(UnresolvedDomain{Name: tt.domain, CloudflareCredentials: &Credentials{"foo@example.com", "123456789"}})
+				got, _ := resolver.Resolve(UnresolvedDomain{Name: tt.domain, CloudflareMetadata: &CloudflareDomainMetadata{
+					BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+					CloudflareCredentials: &Credentials{"foo@example.com", "123456789"},
+				}})
 
 				assert.DeepEqual(t, got, tt.want)
 			})
@@ -117,8 +123,11 @@ func TestCloudflare(t *testing.T) {
 		resolver.c = &ClientStub{responses: stubbedZoneResponse}
 
 		got, err := resolver.Resolve(UnresolvedDomain{
-			Name:                  "example.com",
-			CloudflareCredentials: &Credentials{"foo@example.com", "1234567890"},
+			Name: "example.com",
+			CloudflareMetadata: &CloudflareDomainMetadata{
+				BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+				CloudflareCredentials: &Credentials{"foo@example.com", "123456789"},
+			},
 		})
 
 		assert.Assert(t, got == nil)
@@ -141,8 +150,11 @@ func TestCloudflare(t *testing.T) {
 		}}
 
 		got, _ := resolver.Resolve(UnresolvedDomain{
-			Name:                  "www.example.com",
-			CloudflareCredentials: &Credentials{"foo@example.com", "1234567890"},
+			Name: "www.example.com",
+			CloudflareMetadata: &CloudflareDomainMetadata{
+				BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+				CloudflareCredentials: &Credentials{"foo@example.com", "123456789"},
+			},
 		})
 
 		assert.DeepEqual(t, got, []string{"127.0.0.8"})
@@ -153,8 +165,11 @@ func TestCloudflare(t *testing.T) {
 		resolver.c = &ClientStub{errStub: errors.New("http error")}
 
 		got, _ := resolver.Resolve(UnresolvedDomain{
-			Name:                  "example.com",
-			CloudflareCredentials: nil,
+			Name: "example.com",
+			CloudflareMetadata: &CloudflareDomainMetadata{
+				BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+				CloudflareCredentials: nil,
+			},
 		})
 
 		assert.Assert(t, got == nil)

@@ -59,9 +59,10 @@ func TestCloudflareCredentialsChecker(t *testing.T) {
 				name: "1 domain simple happy path",
 				domains: []UnresolvedDomain{
 					{
-						Name:                  "domain-behind-cloudflare.com",
-						IsBehindCloudflare:    true,
-						BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+						Name: "domain-behind-cloudflare.com",
+						CloudflareMetadata: &CloudflareDomainMetadata{
+							BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+						},
 					},
 				},
 				responses: []ExpectedResponse{
@@ -72,10 +73,11 @@ func TestCloudflareCredentialsChecker(t *testing.T) {
 				},
 				wantResult: []UnresolvedDomain{
 					{
-						Name:                  "domain-behind-cloudflare.com",
-						IsBehindCloudflare:    true,
-						BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
-						CloudflareCredentials: &Credentials{"foo@example.com", "1234567890"},
+						Name: "domain-behind-cloudflare.com",
+						CloudflareMetadata: &CloudflareDomainMetadata{
+							BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+							CloudflareCredentials: &Credentials{"foo@example.com", "1234567890"},
+						},
 					},
 				},
 			},
@@ -83,9 +85,10 @@ func TestCloudflareCredentialsChecker(t *testing.T) {
 				name: "1 domain decline first prompt",
 				domains: []UnresolvedDomain{
 					{
-						Name:                  "domain-behind-cloudflare.com",
-						IsBehindCloudflare:    true,
-						BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+						Name: "domain-behind-cloudflare.com",
+						CloudflareMetadata: &CloudflareDomainMetadata{
+							BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+						},
 					},
 				},
 				responses: []ExpectedResponse{
@@ -93,10 +96,10 @@ func TestCloudflareCredentialsChecker(t *testing.T) {
 				},
 				wantResult: []UnresolvedDomain{
 					{
-						Name:                  "domain-behind-cloudflare.com",
-						IsBehindCloudflare:    true,
-						BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
-						CloudflareCredentials: nil,
+						Name: "domain-behind-cloudflare.com",
+						CloudflareMetadata: &CloudflareDomainMetadata{
+							BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+						},
 					},
 				},
 			},
@@ -104,9 +107,10 @@ func TestCloudflareCredentialsChecker(t *testing.T) {
 				name: "1 domain decline first prompt (capital N)",
 				domains: []UnresolvedDomain{
 					{
-						Name:                  "domain-behind-cloudflare.com",
-						IsBehindCloudflare:    true,
-						BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+						Name: "domain-behind-cloudflare.com",
+						CloudflareMetadata: &CloudflareDomainMetadata{
+							BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+						},
 					},
 				},
 				responses: []ExpectedResponse{
@@ -114,10 +118,10 @@ func TestCloudflareCredentialsChecker(t *testing.T) {
 				},
 				wantResult: []UnresolvedDomain{
 					{
-						Name:                  "domain-behind-cloudflare.com",
-						IsBehindCloudflare:    true,
-						BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
-						CloudflareCredentials: nil,
+						Name: "domain-behind-cloudflare.com",
+						CloudflareMetadata: &CloudflareDomainMetadata{
+							BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+						},
 					},
 				},
 			},
@@ -125,9 +129,10 @@ func TestCloudflareCredentialsChecker(t *testing.T) {
 				name: "1 domain decline second prompt",
 				domains: []UnresolvedDomain{
 					{
-						Name:                  "domain-behind-cloudflare.com",
-						IsBehindCloudflare:    true,
-						BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+						Name: "domain-behind-cloudflare.com",
+						CloudflareMetadata: &CloudflareDomainMetadata{
+							BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+						},
 					},
 				},
 				responses: []ExpectedResponse{
@@ -136,10 +141,10 @@ func TestCloudflareCredentialsChecker(t *testing.T) {
 				},
 				wantResult: []UnresolvedDomain{
 					{
-						Name:                  "domain-behind-cloudflare.com",
-						IsBehindCloudflare:    true,
-						BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
-						CloudflareCredentials: nil,
+						Name: "domain-behind-cloudflare.com",
+						CloudflareMetadata: &CloudflareDomainMetadata{
+							BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+						},
 					},
 				},
 			},
@@ -147,9 +152,10 @@ func TestCloudflareCredentialsChecker(t *testing.T) {
 				name: "1 domain decline second prompt (capital N)",
 				domains: []UnresolvedDomain{
 					{
-						Name:                  "domain-behind-cloudflare.com",
-						IsBehindCloudflare:    true,
-						BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+						Name: "domain-behind-cloudflare.com",
+						CloudflareMetadata: &CloudflareDomainMetadata{
+							BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+						},
 					},
 				},
 				responses: []ExpectedResponse{
@@ -158,10 +164,10 @@ func TestCloudflareCredentialsChecker(t *testing.T) {
 				},
 				wantResult: []UnresolvedDomain{
 					{
-						Name:                  "domain-behind-cloudflare.com",
-						IsBehindCloudflare:    true,
-						BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
-						CloudflareCredentials: nil,
+						Name: "domain-behind-cloudflare.com",
+						CloudflareMetadata: &CloudflareDomainMetadata{
+							BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+						},
 					},
 				},
 			},
@@ -169,14 +175,13 @@ func TestCloudflareCredentialsChecker(t *testing.T) {
 				name: "1 domain behind cloudflare, 1 domain not",
 				domains: []UnresolvedDomain{
 					{
-						Name:                  "example.com",
-						IsBehindCloudflare:    false,
-						BaseDomainNameservers: []string{"ns1.example.com"},
+						Name: "example.com",
 					},
 					{
-						Name:                  "domain-behind-cloudflare.com",
-						IsBehindCloudflare:    true,
-						BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+						Name: "domain-behind-cloudflare.com",
+						CloudflareMetadata: &CloudflareDomainMetadata{
+							BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+						},
 					},
 				},
 				responses: []ExpectedResponse{
@@ -187,16 +192,14 @@ func TestCloudflareCredentialsChecker(t *testing.T) {
 				},
 				wantResult: []UnresolvedDomain{
 					{
-						Name:                  "example.com",
-						IsBehindCloudflare:    false,
-						BaseDomainNameservers: []string{"ns1.example.com"},
-						CloudflareCredentials: nil,
+						Name: "example.com",
 					},
 					{
-						Name:                  "domain-behind-cloudflare.com",
-						IsBehindCloudflare:    true,
-						BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
-						CloudflareCredentials: &Credentials{"foo@example.com", "1234567890"},
+						Name: "domain-behind-cloudflare.com",
+						CloudflareMetadata: &CloudflareDomainMetadata{
+							BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+							CloudflareCredentials: &Credentials{"foo@example.com", "1234567890"},
+						},
 					},
 				},
 			},
@@ -204,14 +207,16 @@ func TestCloudflareCredentialsChecker(t *testing.T) {
 				name: "2 domains 1 cloudflare account",
 				domains: []UnresolvedDomain{
 					{
-						Name:                  "domain-behind-cloudflare.com",
-						IsBehindCloudflare:    true,
-						BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+						Name: "domain-behind-cloudflare.com",
+						CloudflareMetadata: &CloudflareDomainMetadata{
+							BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+						},
 					},
 					{
-						Name:                  "sub.domain-behind-cloudflare.com",
-						IsBehindCloudflare:    true,
-						BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+						Name: "sub.domain-behind-cloudflare.com",
+						CloudflareMetadata: &CloudflareDomainMetadata{
+							BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+						},
 					},
 				},
 				responses: []ExpectedResponse{
@@ -222,16 +227,18 @@ func TestCloudflareCredentialsChecker(t *testing.T) {
 				},
 				wantResult: []UnresolvedDomain{
 					{
-						Name:                  "domain-behind-cloudflare.com",
-						IsBehindCloudflare:    true,
-						BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
-						CloudflareCredentials: &Credentials{"foo@example.com", "1234567890"},
+						Name: "domain-behind-cloudflare.com",
+						CloudflareMetadata: &CloudflareDomainMetadata{
+							BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+							CloudflareCredentials: &Credentials{"foo@example.com", "1234567890"},
+						},
 					},
 					{
-						Name:                  "sub.domain-behind-cloudflare.com",
-						IsBehindCloudflare:    true,
-						BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
-						CloudflareCredentials: &Credentials{"foo@example.com", "1234567890"},
+						Name: "sub.domain-behind-cloudflare.com",
+						CloudflareMetadata: &CloudflareDomainMetadata{
+							BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+							CloudflareCredentials: &Credentials{"foo@example.com", "1234567890"},
+						},
 					},
 				},
 			},
@@ -239,14 +246,16 @@ func TestCloudflareCredentialsChecker(t *testing.T) {
 				name: "2 domains 2 cloudflare accounts",
 				domains: []UnresolvedDomain{
 					{
-						Name:                  "domain-behind-cloudflare.com",
-						IsBehindCloudflare:    true,
-						BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+						Name: "domain-behind-cloudflare.com",
+						CloudflareMetadata: &CloudflareDomainMetadata{
+							BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+						},
 					},
 					{
-						Name:                  "another-domain-behind-cloudflare.com",
-						IsBehindCloudflare:    true,
-						BaseDomainNameservers: []string{"baz.ns.cloudflare.com", "bing.ns.cloudflare.com"},
+						Name: "another-domain-behind-cloudflare.com",
+						CloudflareMetadata: &CloudflareDomainMetadata{
+							BaseDomainNameservers: []string{"baz.ns.cloudflare.com", "bing.ns.cloudflare.com"},
+						},
 					},
 				},
 				responses: []ExpectedResponse{
@@ -260,16 +269,18 @@ func TestCloudflareCredentialsChecker(t *testing.T) {
 				},
 				wantResult: []UnresolvedDomain{
 					{
-						Name:                  "domain-behind-cloudflare.com",
-						IsBehindCloudflare:    true,
-						BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
-						CloudflareCredentials: &Credentials{"foo@example.com", "1234567890"},
+						Name: "domain-behind-cloudflare.com",
+						CloudflareMetadata: &CloudflareDomainMetadata{
+							BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+							CloudflareCredentials: &Credentials{"foo@example.com", "1234567890"},
+						},
 					},
 					{
-						Name:                  "another-domain-behind-cloudflare.com",
-						IsBehindCloudflare:    true,
-						BaseDomainNameservers: []string{"baz.ns.cloudflare.com", "bing.ns.cloudflare.com"},
-						CloudflareCredentials: &Credentials{"bar@example.com", "9876543210"},
+						Name: "another-domain-behind-cloudflare.com",
+						CloudflareMetadata: &CloudflareDomainMetadata{
+							BaseDomainNameservers: []string{"baz.ns.cloudflare.com", "bing.ns.cloudflare.com"},
+							CloudflareCredentials: &Credentials{"bar@example.com", "9876543210"},
+						},
 					},
 				},
 			},
@@ -277,14 +288,16 @@ func TestCloudflareCredentialsChecker(t *testing.T) {
 				name: "2 domains 2 cloudflare accounts but only 1 credentials",
 				domains: []UnresolvedDomain{
 					{
-						Name:                  "domain-behind-cloudflare.com",
-						IsBehindCloudflare:    true,
-						BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+						Name: "domain-behind-cloudflare.com",
+						CloudflareMetadata: &CloudflareDomainMetadata{
+							BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+						},
 					},
 					{
-						Name:                  "another-domain-behind-cloudflare.com",
-						IsBehindCloudflare:    true,
-						BaseDomainNameservers: []string{"baz.ns.cloudflare.com", "bing.ns.cloudflare.com"},
+						Name: "another-domain-behind-cloudflare.com",
+						CloudflareMetadata: &CloudflareDomainMetadata{
+							BaseDomainNameservers: []string{"baz.ns.cloudflare.com", "bing.ns.cloudflare.com"},
+						},
 					},
 				},
 				responses: []ExpectedResponse{
@@ -296,16 +309,18 @@ func TestCloudflareCredentialsChecker(t *testing.T) {
 				},
 				wantResult: []UnresolvedDomain{
 					{
-						Name:                  "domain-behind-cloudflare.com",
-						IsBehindCloudflare:    true,
-						BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
-						CloudflareCredentials: &Credentials{"foo@example.com", "1234567890"},
+						Name: "domain-behind-cloudflare.com",
+						CloudflareMetadata: &CloudflareDomainMetadata{
+							BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+							CloudflareCredentials: &Credentials{"foo@example.com", "1234567890"},
+						},
 					},
 					{
-						Name:                  "another-domain-behind-cloudflare.com",
-						IsBehindCloudflare:    true,
-						BaseDomainNameservers: []string{"baz.ns.cloudflare.com", "bing.ns.cloudflare.com"},
-						CloudflareCredentials: nil,
+						Name: "another-domain-behind-cloudflare.com",
+						CloudflareMetadata: &CloudflareDomainMetadata{
+							BaseDomainNameservers: []string{"baz.ns.cloudflare.com", "bing.ns.cloudflare.com"},
+							CloudflareCredentials: nil,
+						},
 					},
 				},
 			},

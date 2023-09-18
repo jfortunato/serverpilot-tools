@@ -34,23 +34,27 @@ type AppDomainStatus struct {
 
 // UnresolvedDomain is the result of evaluating a domain's metadata, before it is resolved.
 type UnresolvedDomain struct {
-	Name                  string
-	IsBehindCloudflare    bool
-	BaseDomainNameservers []string
-	CloudflareCredentials *Credentials
+	Name               string
+	CloudflareMetadata *CloudflareDomainMetadata
 }
 
 func (c *DnsChecker) EvaluateDomains(domains []string) []UnresolvedDomain {
 	var results []UnresolvedDomain
 
 	for _, domain := range domains {
-		// TODO: it should not be necessary to check nameservers for domains not behind cloudflare, they're not used
-		ns, _ := c.cfChecker.GetNameserversForBaseDomain(domain)
+		var cloudflareMetadata *CloudflareDomainMetadata
+		if c.cfChecker.IsBehindCloudFlare(domain) {
+			// Only get the nameservers if the domain is behind Cloudflare
+			ns, _ := c.cfChecker.GetNameserversForBaseDomain(domain)
+			cloudflareMetadata = &CloudflareDomainMetadata{
+				BaseDomainNameservers: ns,
+				CloudflareCredentials: nil, // Will be prompted for later
+			}
+		}
 
 		result := UnresolvedDomain{
-			Name:                  domain,
-			IsBehindCloudflare:    c.cfChecker.IsBehindCloudFlare(domain),
-			BaseDomainNameservers: ns,
+			Name:               domain,
+			CloudflareMetadata: cloudflareMetadata,
 		}
 
 		results = append(results, result)

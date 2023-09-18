@@ -49,7 +49,7 @@ func NewResolver(cfResolver IpResolver, cfChecker cloudflareChecker, ipLookup Ip
 func (r *Resolver) Resolve(domain UnresolvedDomain) ([]string, error) {
 	// If the domain is behind CloudFlare, we won't be able to resolve the real IP addresses unless
 	// we have CloudFlare API credentials for the domain.
-	if domain.IsBehindCloudflare {
+	if domain.CloudflareMetadata != nil {
 		resolved, err := r.cfResolver.Resolve(domain)
 		if err != nil {
 			return nil, fmt.Errorf("%w: cloudflare error", ErrorDomainBehindCloudFlare)

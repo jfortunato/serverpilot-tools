@@ -106,8 +106,8 @@ func (c *CloudflareCredentialsChecker) checkDomains(domains []UnresolvedDomain) 
 	nameserverDomains := make([]NameserverDomains, 0)
 
 	for _, domain := range domains {
-		if domain.IsBehindCloudflare {
-			nameserverDomains = appendOrInitializeNameserverDomains(nameserverDomains, domain.BaseDomainNameservers, domain.Name)
+		if domain.CloudflareMetadata != nil {
+			nameserverDomains = appendOrInitializeNameserverDomains(nameserverDomains, domain.CloudflareMetadata.BaseDomainNameservers, domain.Name)
 		}
 	}
 
@@ -143,7 +143,7 @@ func (c *CloudflareCredentialsChecker) PromptForCredentials(domains []Unresolved
 	for i, domain := range domains {
 		for _, nsd := range result {
 			if contains(nsd.Domains, domain.Name) {
-				domains[i].CloudflareCredentials = nsd.Credentials
+				domains[i].CloudflareMetadata.CloudflareCredentials = nsd.Credentials
 				break
 			}
 		}

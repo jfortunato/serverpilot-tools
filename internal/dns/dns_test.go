@@ -143,10 +143,7 @@ func TestDNS(t *testing.T) {
 				[]string{"example.com"},
 				[]UnresolvedDomain{
 					{
-						"example.com",
-						false,
-						[]string{"ns1.example.com"},
-						nil,
+						Name: "example.com",
 					},
 				},
 			},
@@ -155,10 +152,7 @@ func TestDNS(t *testing.T) {
 				[]string{"sub.example.com"},
 				[]UnresolvedDomain{
 					{
-						"sub.example.com",
-						false,
-						[]string{"ns1.example.com"},
-						nil,
+						Name: "sub.example.com",
 					},
 				},
 			},
@@ -167,10 +161,11 @@ func TestDNS(t *testing.T) {
 				[]string{"domain-behind-cloudflare.com"},
 				[]UnresolvedDomain{
 					{
-						"domain-behind-cloudflare.com",
-						true,
-						[]string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
-						nil,
+						Name: "domain-behind-cloudflare.com",
+						CloudflareMetadata: &CloudflareDomainMetadata{
+							[]string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+							nil,
+						},
 					},
 				},
 			},

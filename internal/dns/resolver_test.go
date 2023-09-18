@@ -14,7 +14,7 @@ func TestResolver(t *testing.T) {
 	t.Run("it should resolve the ip addresses for the given domain name", func(t *testing.T) {
 		resolver := newResolverWithStubs()
 
-		got, _ := resolver.Resolve(UnresolvedDomain{Name: "example.com", IsBehindCloudflare: false, BaseDomainNameservers: []string{"ns1.example.com"}, CloudflareCredentials: nil})
+		got, _ := resolver.Resolve(UnresolvedDomain{Name: "example.com"})
 		want := []string{"127.0.0.1"}
 
 		assert.DeepEqual(t, got, want)
@@ -30,16 +30,18 @@ func TestResolver(t *testing.T) {
 			expectedResult []string
 		}{
 			{UnresolvedDomain{
-				Name:                  "domain-behind-cloudflare.com",
-				IsBehindCloudflare:    true,
-				BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
-				CloudflareCredentials: nil,
+				Name: "domain-behind-cloudflare.com",
+				CloudflareMetadata: &CloudflareDomainMetadata{
+					BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+					CloudflareCredentials: nil,
+				},
 			}, "", nil},
 			{UnresolvedDomain{
-				Name:                  "domain-behind-cloudflare.com",
-				IsBehindCloudflare:    true,
-				BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
-				CloudflareCredentials: nil,
+				Name: "domain-behind-cloudflare.com",
+				CloudflareMetadata: &CloudflareDomainMetadata{
+					BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+					CloudflareCredentials: nil,
+				},
 			}, "127.0.0.1", []string{"127.0.0.1"}},
 		}
 
@@ -68,10 +70,11 @@ func TestResolver(t *testing.T) {
 		resolver.cfResolver = &IpResolverStub{}
 
 		got, err := resolver.Resolve(UnresolvedDomain{
-			Name:                  "domain-behind-cloudflare.com",
-			IsBehindCloudflare:    true,
-			BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
-			CloudflareCredentials: nil,
+			Name: "domain-behind-cloudflare.com",
+			CloudflareMetadata: &CloudflareDomainMetadata{
+				BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+				CloudflareCredentials: nil,
+			},
 		})
 
 		assert.Assert(t, got == nil)
