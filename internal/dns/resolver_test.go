@@ -14,7 +14,7 @@ func TestResolver(t *testing.T) {
 	t.Run("it should resolve the ip addresses for the given domain name", func(t *testing.T) {
 		resolver := newResolverWithStubs()
 
-		got, _ := resolver.Resolve("example.com")
+		got, _ := resolver.Resolve(UnresolvedDomain{Name: "example.com", IsBehindCloudflare: false, BaseDomainNameservers: []string{"ns1.example.com"}, CloudflareCredentials: nil})
 		want := []string{"127.0.0.1"}
 
 		assert.DeepEqual(t, got, want)
@@ -25,12 +25,22 @@ func TestResolver(t *testing.T) {
 
 	t.Run("it should defer to the cloudflare resolver when the domain is on cloudflare nameservers", func(t *testing.T) {
 		var tests = []struct {
-			domain         string
+			domain         UnresolvedDomain
 			stubbedResult  string
 			expectedResult []string
 		}{
-			{"domain-behind-cloudflare.com", "", nil},
-			{"domain-behind-cloudflare.com", "127.0.0.1", []string{"127.0.0.1"}},
+			{UnresolvedDomain{
+				Name:                  "domain-behind-cloudflare.com",
+				IsBehindCloudflare:    true,
+				BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+				CloudflareCredentials: nil,
+			}, "", nil},
+			{UnresolvedDomain{
+				Name:                  "domain-behind-cloudflare.com",
+				IsBehindCloudflare:    true,
+				BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+				CloudflareCredentials: nil,
+			}, "127.0.0.1", []string{"127.0.0.1"}},
 		}
 
 		for _, tt := range tests {
@@ -42,7 +52,7 @@ func TestResolver(t *testing.T) {
 				if tt.stubbedResult == "" {
 					stub = map[string]string{}
 				} else {
-					stub = map[string]string{tt.domain: tt.stubbedResult}
+					stub = map[string]string{tt.domain.Name: tt.stubbedResult}
 				}
 				resolver.cfResolver = &IpResolverStub{ips: stub}
 
@@ -57,7 +67,12 @@ func TestResolver(t *testing.T) {
 		resolver := newResolverWithStubs()
 		resolver.cfResolver = &IpResolverStub{}
 
-		got, err := resolver.Resolve("domain-behind-cloudflare.com")
+		got, err := resolver.Resolve(UnresolvedDomain{
+			Name:                  "domain-behind-cloudflare.com",
+			IsBehindCloudflare:    true,
+			BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+			CloudflareCredentials: nil,
+		})
 
 		assert.Assert(t, got == nil)
 		assert.ErrorIs(t, err, ErrorDomainBehindCloudFlare)
@@ -68,7 +83,6 @@ func newResolverWithStubs() *Resolver {
 	return NewResolver(
 		&IpResolverStub{},
 		&CloudflareCheckerStub{},
-		nil,
 		IpLookupStub,
 		log.New(io.Discard, "", 0),
 	)

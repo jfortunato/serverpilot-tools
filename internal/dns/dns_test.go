@@ -4,6 +4,8 @@ import (
 	"errors"
 	"github.com/jfortunato/serverpilot-tools/internal/serverpilot"
 	"gotest.tools/v3/assert"
+	"io"
+	"log"
 	"testing"
 )
 
@@ -52,9 +54,9 @@ func TestDNS(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				checker := NewDnsChecker(&IpResolverStub{tt.resolvedIps})
+				checker := NewDnsChecker(&IpResolverStub{tt.resolvedIps}, nil)
 
-				got := checker.CheckStatus(tt.domain, tt.serverIp)
+				got := checker.CheckStatus(UnresolvedDomain{Name: tt.domain}, tt.serverIp)
 				want := tt.want
 
 				assert.Equal(t, got, want)
@@ -65,6 +67,7 @@ func TestDNS(t *testing.T) {
 	t.Run("it should return a list of inactive app domains", func(t *testing.T) {
 		var tests = []struct {
 			name           string
+			domains        []UnresolvedDomain
 			appservers     []serverpilot.AppServer
 			resolvedIps    map[string]string
 			includeUnknown bool
@@ -72,6 +75,11 @@ func TestDNS(t *testing.T) {
 		}{
 			{
 				"only inactive domains",
+				[]UnresolvedDomain{
+					{Name: "ok.example.com"},
+					{Name: "inactive.example.com"},
+					{Name: "unknown.example.com"},
+				},
 				[]serverpilot.AppServer{
 					{serverpilot.App{Id: "1", Domains: []string{"ok.example.com"}}, serverpilot.Server{Name: "server1", Ipaddress: "127.0.0.1"}},
 					{serverpilot.App{Id: "2", Domains: []string{"inactive.example.com"}}, serverpilot.Server{Name: "server1", Ipaddress: "127.0.0.1"}},
@@ -89,6 +97,11 @@ func TestDNS(t *testing.T) {
 			},
 			{
 				"inactive & unknown domains",
+				[]UnresolvedDomain{
+					{Name: "ok.example.com"},
+					{Name: "inactive.example.com"},
+					{Name: "unknown.example.com"},
+				},
 				[]serverpilot.AppServer{
 					{serverpilot.App{Id: "1", Domains: []string{"ok.example.com"}}, serverpilot.Server{Name: "server1", Ipaddress: "127.0.0.1"}},
 					{serverpilot.App{Id: "2", Domains: []string{"inactive.example.com"}}, serverpilot.Server{Name: "server1", Ipaddress: "127.0.0.1"}},
@@ -109,12 +122,72 @@ func TestDNS(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				checker := NewDnsChecker(&IpResolverStub{tt.resolvedIps})
+				checker := NewDnsChecker(&IpResolverStub{tt.resolvedIps}, nil)
 
-				got := checker.GetInactiveAppDomains(&FakeTicker{}, tt.appservers, tt.includeUnknown)
+				got := checker.GetInactiveAppDomains(&FakeTicker{}, tt.domains, tt.appservers, tt.includeUnknown)
 				want := tt.want
 
 				assert.DeepEqual(t, got, want)
+			})
+		}
+	})
+
+	t.Run("it should evaluate domains", func(t *testing.T) {
+		var tests = []struct {
+			name    string
+			domains []string
+			want    []UnresolvedDomain
+		}{
+			{
+				"1 simple domain, not behind cloudflare",
+				[]string{"example.com"},
+				[]UnresolvedDomain{
+					{
+						"example.com",
+						false,
+						[]string{"ns1.example.com"},
+						nil,
+					},
+				},
+			},
+			{
+				"1 subdomain, not behind cloudflare",
+				[]string{"sub.example.com"},
+				[]UnresolvedDomain{
+					{
+						"sub.example.com",
+						false,
+						[]string{"ns1.example.com"},
+						nil,
+					},
+				},
+			},
+			{
+				"1 simple domain behind cloudflare",
+				[]string{"domain-behind-cloudflare.com"},
+				[]UnresolvedDomain{
+					{
+						"domain-behind-cloudflare.com",
+						true,
+						[]string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+						nil,
+					},
+				},
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				checker := NewDnsChecker(nil, &CloudflareCredentialsChecker{
+					l:        log.New(io.Discard, "", 0),
+					p:        nil,
+					lookupNs: NsLookupStub,
+					cachedNs: nil,
+				})
+
+				got := checker.EvaluateDomains(tt.domains)
+
+				assert.DeepEqual(t, got, tt.want)
 			})
 		}
 	})
@@ -128,12 +201,12 @@ type IpResolverStub struct {
 	ips map[string]string
 }
 
-func (s *IpResolverStub) Resolve(domain string) ([]string, error) {
+func (s *IpResolverStub) Resolve(domain UnresolvedDomain) ([]string, error) {
 	if s.ips == nil {
 		return nil, errors.New("no ips")
 	}
 
-	ip, ok := s.ips[domain]
+	ip, ok := s.ips[domain.Name]
 	if !ok {
 		return nil, nil
 	}

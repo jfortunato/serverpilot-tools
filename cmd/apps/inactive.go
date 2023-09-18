@@ -47,20 +47,27 @@ func newInactiveCommand() *cobra.Command {
 
 func runInactive(user, key string, options inactiveOptions) error {
 	logger := createLogger(options.verbose)
+	cfChecker := dns.NewCloudflareCredentialsChecker(logger, &dns.Prompter{}, nil)
+	dnsChecker := createDomainChecker(logger, cfChecker)
 
 	apps, err := getAppServers(logger, user, key)
 	if err != nil {
 		return err
 	}
 
-	cloudflareChecker, nsd := dns.PromptForCloudflareCredentials(logger, apps)
-	dnsChecker := createDomainChecker(logger, cloudflareChecker, nsd)
+	// Transform the list of AppServers into a list of all their domains
+	domains := getAllDomains(apps)
 
-	bar := progressbar.NewProgressBar(len(apps))
+	// Evaluate all domains, and determine if they are behind Cloudflare
+	unresolvedDomains := dnsChecker.EvaluateDomains(domains)
 
+	// Prompt for Cloudflare credentials for each unique account discovered
+	unresolvedDomains = cfChecker.PromptForCredentials(unresolvedDomains)
+
+	// Resolve the UnresolvedDomains, and determine if they are pointing to the correct server
+	bar := progressbar.NewProgressBar(len(unresolvedDomains))
 	// Only print out the inactive apps by default, but allow the user to include unknown domains with a flag
-	filtered := dnsChecker.GetInactiveAppDomains(bar, apps, options.includeUnknown)
-
+	filtered := dnsChecker.GetInactiveAppDomains(bar, unresolvedDomains, apps, options.includeUnknown)
 	bar.Clear()
 
 	// Print out the inactive apps, with their status (INACTIVE/PARTIAL/UNKNOWN)
@@ -93,6 +100,14 @@ func getAppServers(logger *log.Logger, user, key string) ([]serverpilot.AppServe
 	return appServers, nil
 }
 
+func getAllDomains(appServers []serverpilot.AppServer) []string {
+	var domains []string
+	for _, appServer := range appServers {
+		domains = append(domains, appServer.Domains...)
+	}
+	return domains
+}
+
 func createLogger(isVerbose bool) *log.Logger {
 	logger := log.New(io.Discard, "", 0)
 	if isVerbose {
@@ -101,8 +116,8 @@ func createLogger(isVerbose bool) *log.Logger {
 	return logger
 }
 
-func createDomainChecker(logger *log.Logger, checker *dns.CloudflareCredentialsChecker, nsd []dns.NameserverDomains) *dns.DnsChecker {
-	return dns.NewDnsChecker(dns.NewResolver(nil, checker, nsd, nil, logger))
+func createDomainChecker(logger *log.Logger, checker *dns.CloudflareCredentialsChecker) *dns.DnsChecker {
+	return dns.NewDnsChecker(dns.NewResolver(nil, checker, nil, logger), checker)
 }
 
 func getServerForApp(app serverpilot.App, servers []serverpilot.Server) serverpilot.Server {

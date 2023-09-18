@@ -6,10 +6,8 @@ import (
 	"fmt"
 	"github.com/jfortunato/serverpilot-tools/internal/http"
 	"log"
-	"net"
 	"reflect"
 	"regexp"
-	"sort"
 	"strings"
 )
 
@@ -22,10 +20,9 @@ const PerPage = 50
 
 // CloudflareResolver is a DNS resolver that uses the Cloudflare API to resolve DNS records.
 type CloudflareResolver struct {
-	l                 *log.Logger
-	parent            IpResolver
-	c                 http.CachingRateLimitedClient
-	nameserverDomains []NameserverDomains
+	l      *log.Logger
+	parent IpResolver
+	c      http.CachingRateLimitedClient
 }
 
 // Credentials are the credentials used to authenticate with the Cloudflare API.
@@ -72,24 +69,23 @@ type CloudflareResponse[T any] struct {
 
 // NewCloudflareResolver creates a new CloudflareResolver. Caching and rate limiting of the API requests is handled by the http.CachingRateLimitedClient.
 // The nameservers are used to determine if the domain is managed by the Cloudflare account that we have credentials for.
-func NewCloudflareResolver(l *log.Logger, parent IpResolver, c http.CachingRateLimitedClient, nsd []NameserverDomains) *CloudflareResolver {
+func NewCloudflareResolver(l *log.Logger, parent IpResolver, c http.CachingRateLimitedClient) *CloudflareResolver {
 	return &CloudflareResolver{
-		l:                 l,
-		parent:            parent,
-		c:                 c,
-		nameserverDomains: nsd,
+		l:      l,
+		parent: parent,
+		c:      c,
 	}
 }
 
 // Resolve resolves the domain using the Cloudflare API. It implements the IpResolver interface.
-func (r *CloudflareResolver) Resolve(domain string) ([]string, error) {
-	creds := r.getCredentialsForDomain(domain)
+func (r *CloudflareResolver) Resolve(domain UnresolvedDomain) ([]string, error) {
+	creds := domain.CloudflareCredentials
 
 	if creds == nil {
 		return nil, fmt.Errorf("%w: no credentials provided", ErrCouldNotMakeRequest)
 	}
 
-	zone, err := r.getZoneForDomain(domain, creds)
+	zone, err := r.getZoneForDomain(domain.Name, creds)
 	if err != nil {
 		return nil, err
 	}
@@ -99,17 +95,7 @@ func (r *CloudflareResolver) Resolve(domain string) ([]string, error) {
 		return nil, err
 	}
 
-	return r.findMatchingRecord(domain, records)
-}
-
-func (r *CloudflareResolver) getCredentialsForDomain(domain string) *Credentials {
-	for _, nsd := range r.nameserverDomains {
-		if contains(nsd.Domains, domain) {
-			return nsd.Credentials
-		}
-	}
-
-	return nil
+	return r.findMatchingRecord(domain.Name, records)
 }
 
 func (r *CloudflareResolver) findMatchingRecord(domain string, records []DnsRecord) ([]string, error) {
@@ -134,7 +120,12 @@ func (r *CloudflareResolver) findMatchingRecord(domain string, records []DnsReco
 					return r.findMatchingRecord(target, records)
 				}
 
-				return r.parent.Resolve(target)
+				return r.parent.Resolve(UnresolvedDomain{
+					Name:                  target,
+					IsBehindCloudflare:    false,
+					BaseDomainNameservers: nil,
+					CloudflareCredentials: nil,
+				})
 			}
 
 			if record.Type == "A" {
@@ -208,161 +199,6 @@ func (r *CloudflareResolver) getDnsRecordsForZone(z Zone, creds *Credentials) ([
 	}
 
 	return items, nil
-}
-
-// CloudflareCredentialsChecker is responsible for checking a list of domains and determing if they are behind Cloudflare. It will prompt for API credentials for each unique cloudflare account detected.
-type CloudflareCredentialsChecker struct {
-	l        *log.Logger
-	p        CredentialsPrompter
-	lookupNs NsLookupFunc
-	cachedNs map[string][]string
-}
-
-// CredentialsPrompter is an interface for interacting with the user to prompt for input
-// It optionally takes a slice of valid responses and won't return until the user enters a valid response
-type CredentialsPrompter interface {
-	Prompt(msg, defaultResponse string, validResponse []string) string
-}
-
-type Prompter struct {
-}
-
-func (p *Prompter) Prompt(msg, defaultResponse string, validResponse []string) string {
-	fmt.Print(msg)
-	var response string
-	fmt.Scanln(&response)
-
-	// If the response is empty, then use the default response
-	if response == "" {
-		response = defaultResponse
-	}
-
-	// If the response is not in the valid responses, then prompt again
-	for validResponse != nil && !contains(validResponse, response) {
-		return p.Prompt(msg, defaultResponse, validResponse)
-	}
-
-	return response
-}
-
-// NameserverDomains is a list of domains that are managed by the same Cloudflare account. The API credentials are used to authenticate with the Cloudflare API.
-type NameserverDomains struct {
-	Nameservers []string
-	Domains     []string
-	Credentials *Credentials
-}
-
-func NewCloudflareCredentialsChecker(l *log.Logger, p CredentialsPrompter, nsLookup NsLookupFunc) *CloudflareCredentialsChecker {
-	// Default to net.LookupNS
-	if nsLookup == nil {
-		nsLookup = net.LookupNS
-	}
-
-	return &CloudflareCredentialsChecker{l: l, p: p, lookupNs: nsLookup}
-}
-
-// IsBehindCloudFlare checks if the domain is behind CloudFlare by looking up the nameservers for the base domain.
-func (c *CloudflareCredentialsChecker) IsBehindCloudFlare(domain string) bool {
-	ns, _ := c.GetNameserversForBaseDomain(domain)
-
-	for _, n := range ns {
-		// Check if the nameserver format matches *.ns.cloudflare.com
-		if len(n) >= 17 && n[len(n)-17:] == "ns.cloudflare.com" {
-			return true
-		}
-	}
-
-	return false
-}
-
-// GetNameserversForBaseDomain looks up the nameservers for the base domain. It caches the nameservers for each domain so additional lookups are not needed.
-func (c *CloudflareCredentialsChecker) GetNameserversForBaseDomain(domain string) ([]string, error) {
-	baseDomain := getBaseDomain(domain)
-
-	// Check if we've already looked up the nameservers for this domain
-	if c.cachedNs == nil || c.cachedNs[baseDomain] == nil {
-		c.l.Println("Looking up nameservers for", baseDomain, "...")
-		ns, _ := c.lookupNs(baseDomain)
-		var nsStrings []string
-		for _, n := range ns {
-			// Remove trailing dot
-			host := strings.TrimSuffix(n.Host, ".")
-			nsStrings = append(nsStrings, host)
-		}
-		// Sort the nameservers so that we can compare them later
-		sort.Strings(nsStrings)
-		c.l.Println("Nameservers for", baseDomain, "are", nsStrings)
-
-		// Cache the nameservers for this domain
-		// Initialize the map if it's nil
-		if c.cachedNs == nil {
-			c.cachedNs = make(map[string][]string)
-		}
-		c.cachedNs[baseDomain] = nsStrings
-	}
-
-	return c.cachedNs[baseDomain], nil
-}
-
-func (c *CloudflareCredentialsChecker) checkDomains(domains []string) ([]NameserverDomains, error) {
-	nameserverDomains := make([]NameserverDomains, 0)
-
-	for _, domain := range domains {
-		if c.IsBehindCloudFlare(domain) {
-			nameservers, err := c.GetNameserversForBaseDomain(domain)
-			if err != nil {
-				return nil, err
-			}
-			nameserverDomains = appendOrInitializeNameserverDomains(nameserverDomains, nameservers, domain)
-		}
-	}
-
-	return nameserverDomains, nil
-}
-
-func (c *CloudflareCredentialsChecker) PromptForCredentials(domains []string) []NameserverDomains {
-	nameserverDomains, err := c.checkDomains(domains)
-	if err != nil {
-		return nil
-	}
-
-	validYesNoResponses := []string{"y", "Y", "n", "N"}
-
-	// The first thing we want it to say is the number of accounts detected, and ask if they want to enter credentials
-	response := c.p.Prompt(fmt.Sprintf("Detected %v CloudFlare accounts. Do you want to use the CloudFlare API to check DNS records? [y/N]", len(nameserverDomains)), "N", validYesNoResponses)
-
-	// If they say no, then we should just return nil, nil
-	if response == "n" || response == "N" {
-		return nameserverDomains
-	}
-
-	// Then the prompter should be called for each unique nameserver
-	result := make([]NameserverDomains, 0)
-
-	for _, nsd := range nameserverDomains {
-		creds := c.promptForCredentials(nsd)
-		nsd.Credentials = creds
-		result = append(result, nsd)
-	}
-
-	return result
-}
-
-func (c *CloudflareCredentialsChecker) promptForCredentials(nsd NameserverDomains) *Credentials {
-	validYesNoResponses := []string{"y", "Y", "n", "N"}
-
-	ns := strings.Join(nsd.Nameservers, ", ")
-	response := c.p.Prompt(fmt.Sprintf("Would you like to enter credentials for %s (domains: %s)? [y/N]", ns, getDomainsText(nsd.Domains, 3)), "N", validYesNoResponses)
-
-	// If they say no, then we should just return nil, nil
-	if response == "n" || response == "N" {
-		return nil
-	}
-
-	email := c.p.Prompt(fmt.Sprintf("Email:"), "", nil)
-	token := c.p.Prompt(fmt.Sprintf("API Token:"), "", nil)
-
-	return &Credentials{email, token}
 }
 
 func getDomainsText(domains []string, totalToShow int) string {
