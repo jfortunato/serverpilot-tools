@@ -58,16 +58,21 @@ func runInactive(user, key string, options inactiveOptions) error {
 	// Transform the list of AppServers into a list of all their domains
 	domains := getAllDomains(apps)
 
+	bar := progressbar.NewProgressBar(len(domains), "Evaluating domains")
+
 	// Evaluate all domains, and determine if they are behind Cloudflare
-	unresolvedDomains := dnsChecker.EvaluateDomains(domains)
+	unresolvedDomains := dnsChecker.EvaluateDomains(bar, domains)
+
+	bar.Finish()
 
 	// Prompt for Cloudflare credentials for each unique account discovered
 	unresolvedDomains = cfChecker.PromptForCredentials(unresolvedDomains)
 
 	// Resolve the UnresolvedDomains, and determine if they are pointing to the correct server
-	bar := progressbar.NewProgressBar(len(unresolvedDomains))
 	// Only print out the inactive apps by default, but allow the user to include unknown domains with a flag
+	bar = progressbar.NewProgressBar(len(unresolvedDomains), "Checking domains")
 	filtered := dnsChecker.GetInactiveAppDomains(bar, unresolvedDomains, apps, options.includeUnknown)
+	bar.Finish()
 	bar.Clear()
 
 	// Print out the inactive apps, with their status (INACTIVE/PARTIAL/UNKNOWN)

@@ -12,8 +12,8 @@ type ProgressBar struct {
 	b *progressbar.ProgressBar
 }
 
-func NewProgressBar(max int) *ProgressBar {
-	return &ProgressBar{b: progressbar.Default(int64(max))}
+func NewProgressBar(max int, description string) *ProgressBar {
+	return &ProgressBar{b: progressbar.Default(int64(max), description)}
 }
 
 func (p *ProgressBar) Tick() {
@@ -22,4 +22,8 @@ func (p *ProgressBar) Tick() {
 
 func (p *ProgressBar) Clear() {
 	p.b.Clear()
+}
+
+func (p *ProgressBar) Finish() {
+	p.b.Finish()
 }

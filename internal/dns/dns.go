@@ -38,7 +38,7 @@ type UnresolvedDomain struct {
 	CloudflareMetadata *CloudflareDomainMetadata
 }
 
-func (c *DnsChecker) EvaluateDomains(domains []string) []UnresolvedDomain {
+func (c *DnsChecker) EvaluateDomains(ticker progressbar.Ticker, domains []string) []UnresolvedDomain {
 	var results []UnresolvedDomain
 
 	for _, domain := range domains {
@@ -58,6 +58,9 @@ func (c *DnsChecker) EvaluateDomains(domains []string) []UnresolvedDomain {
 		}
 
 		results = append(results, result)
+
+		// Tick the progress bar
+		ticker.Tick()
 	}
 
 	return results

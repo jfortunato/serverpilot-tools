@@ -180,7 +180,7 @@ func TestDNS(t *testing.T) {
 					cachedNs: nil,
 				})
 
-				got := checker.EvaluateDomains(tt.domains)
+				got := checker.EvaluateDomains(&FakeTicker{}, tt.domains)
 
 				assert.DeepEqual(t, got, tt.want)
 			})
