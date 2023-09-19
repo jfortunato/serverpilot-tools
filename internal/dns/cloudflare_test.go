@@ -7,6 +7,7 @@ import (
 	"gotest.tools/v3/assert"
 	"io"
 	"log"
+	"strings"
 	"testing"
 )
 
@@ -14,7 +15,13 @@ func TestCloudflare(t *testing.T) {
 	t.Run("it should not be able to resolve a domain behind CloudFlare nameservers that we don't have api credentials for", func(t *testing.T) {
 		resolver := newCloudflareResolverWithStubs()
 
-		got, _ := resolver.Resolve("domain-behind-cloudflare.com")
+		got, _ := resolver.Resolve(UnresolvedDomain{
+			Name: "domain-behind-cloudflare.com",
+			CloudflareMetadata: &CloudflareDomainMetadata{
+				BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+				CloudflareCredentials: nil,
+			},
+		})
 
 		assert.Assert(t, got == nil)
 	})
@@ -98,7 +105,11 @@ func TestCloudflare(t *testing.T) {
 				// Combine the two responses into a single map
 				resolver.c = &ClientStub{responses: combineResponses(stubbedZoneResponses, stubbedDnsResponses)}
 
-				got, _ := resolver.Resolve(tt.domain)
+				// We always want these test have credentials for the domain, so stub the domain with credentials
+				got, _ := resolver.Resolve(UnresolvedDomain{Name: tt.domain, CloudflareMetadata: &CloudflareDomainMetadata{
+					BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+					CloudflareCredentials: &Credentials{"foo@example.com", "123456789"},
+				}})
 
 				assert.DeepEqual(t, got, tt.want)
 			})
@@ -111,7 +122,13 @@ func TestCloudflare(t *testing.T) {
 		resolver := newCloudflareResolverWithStubs()
 		resolver.c = &ClientStub{responses: stubbedZoneResponse}
 
-		got, err := resolver.Resolve("example.com")
+		got, err := resolver.Resolve(UnresolvedDomain{
+			Name: "example.com",
+			CloudflareMetadata: &CloudflareDomainMetadata{
+				BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+				CloudflareCredentials: &Credentials{"foo@example.com", "123456789"},
+			},
+		})
 
 		assert.Assert(t, got == nil)
 		assert.ErrorContains(t, err, "no zone found for domain")
@@ -132,7 +149,13 @@ func TestCloudflare(t *testing.T) {
 			"other-host.com": "127.0.0.8",
 		}}
 
-		got, _ := resolver.Resolve("www.example.com")
+		got, _ := resolver.Resolve(UnresolvedDomain{
+			Name: "www.example.com",
+			CloudflareMetadata: &CloudflareDomainMetadata{
+				BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+				CloudflareCredentials: &Credentials{"foo@example.com", "123456789"},
+			},
+		})
 
 		assert.DeepEqual(t, got, []string{"127.0.0.8"})
 	})
@@ -141,7 +164,13 @@ func TestCloudflare(t *testing.T) {
 		resolver := newCloudflareResolverWithStubs()
 		resolver.c = &ClientStub{errStub: errors.New("http error")}
 
-		got, _ := resolver.Resolve("example.com")
+		got, _ := resolver.Resolve(UnresolvedDomain{
+			Name: "example.com",
+			CloudflareMetadata: &CloudflareDomainMetadata{
+				BaseDomainNameservers: []string{"bar.ns.cloudflare.com", "foo.ns.cloudflare.com"},
+				CloudflareCredentials: nil,
+			},
+		})
 
 		assert.Assert(t, got == nil)
 	})
@@ -195,8 +224,6 @@ func newCloudflareResolverWithStubs() *CloudflareResolver {
 		log.New(io.Discard, "", 0),
 		&IpResolverStub{},
 		&ClientStub{},
-		&Credentials{"foo", "bar"},
-		[]string{"foo.ns.cloudflare.com", "bar.ns.cloudflare.com"},
 	)
 }
 
@@ -220,4 +247,11 @@ type ClientStub struct {
 func (c *ClientStub) GetFromCacheOrFetchWithRateLimit(req http.Request) (string, error) {
 	c.calls++
 	return c.responses[req.Url], c.errStub
+}
+
+func assertStringContains(t *testing.T, s string, substr string) {
+	t.Helper()
+	if !strings.Contains(s, substr) {
+		t.Errorf("Expected %s to contain %s", s, substr)
+	}
 }

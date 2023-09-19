@@ -4,22 +4,19 @@ import (
 	"fmt"
 	"github.com/jfortunato/serverpilot-tools/internal/dns"
 	"github.com/jfortunato/serverpilot-tools/internal/filter"
+	"github.com/jfortunato/serverpilot-tools/internal/progressbar"
 	"github.com/jfortunato/serverpilot-tools/internal/serverpilot"
 	"github.com/jfortunato/serverpilot-tools/internal/servers"
-	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/cobra"
 	"io"
 	"log"
 	"os"
-	"regexp"
-	"strings"
 	"text/tabwriter"
 )
 
 type inactiveOptions struct {
-	verbose               bool
-	includeUnknown        bool
-	cloudflareCredentials string
+	verbose        bool
+	includeUnknown bool
 }
 
 func newInactiveCommand() *cobra.Command {
@@ -34,14 +31,6 @@ func newInactiveCommand() *cobra.Command {
   away and can be deleted.`,
 		Args: cobra.ExactArgs(2),
 		PreRunE: func(cmd *cobra.Command, args []string) error {
-			// Validate Cloudflare credentials, if provided
-			if options.cloudflareCredentials != "" {
-				re := regexp.MustCompile(`^(.+):(.+)$`)
-				if !re.MatchString(options.cloudflareCredentials) {
-					return fmt.Errorf("invalid Cloudflare credentials format")
-				}
-			}
-
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -52,47 +41,39 @@ func newInactiveCommand() *cobra.Command {
 	flags := cmd.Flags()
 	flags.BoolVarP(&options.verbose, "verbose", "v", false, "Verbose output")
 	flags.BoolVarP(&options.includeUnknown, "include-unknown", "u", false, "Include domains with unknown status")
-	flags.StringVarP(&options.cloudflareCredentials, "cloudflare-credentials", "", "", "Cloudflare credentials (email:api-key)")
 
 	return cmd
 }
 
 func runInactive(user, key string, options inactiveOptions) error {
 	logger := createLogger(options.verbose)
-	dnsChecker := createDomainChecker(logger, options.cloudflareCredentials)
-
-	var appDomains []AppDomainStatus
+	cfChecker := dns.NewCloudflareCredentialsChecker(logger, &dns.Prompter{}, nil)
+	dnsChecker := createDomainChecker(logger, cfChecker)
 
 	apps, err := getAppServers(logger, user, key)
 	if err != nil {
 		return err
 	}
 
-	bar := progressbar.Default(int64(len(apps)))
+	// Transform the list of AppServers into a list of all their domains
+	domains := getAllDomains(apps)
 
-	// Loop through each domain, and check if it resolves to the server
-	for _, app := range apps {
-		for _, domain := range app.Domains {
-			status := dnsChecker.CheckStatus(domain, app.Server.Ipaddress)
+	bar := progressbar.NewProgressBar(len(domains), "Evaluating domains")
 
-			appDomains = append(appDomains, AppDomainStatus{app.Id, domain, app.Server.Name, status})
-		}
-		bar.Add(1)
-	}
+	// Evaluate all domains, and determine if they are behind Cloudflare
+	unresolvedDomains := dnsChecker.EvaluateDomains(bar, domains)
 
-	bar.Clear()
+	bar.Finish()
 
+	// Prompt for Cloudflare credentials for each unique account discovered
+	unresolvedDomains = cfChecker.PromptForCredentials(unresolvedDomains)
+
+	// Resolve the UnresolvedDomains, and determine if they are pointing to the correct server
 	// Only print out the inactive apps by default, but allow the user to include unknown domains with a flag
-	var filtered []AppDomainStatus
-	for _, appDomain := range appDomains {
-		if appDomain.Status == dns.INACTIVE {
-			filtered = append(filtered, appDomain)
-		}
-
-		if options.includeUnknown && appDomain.Status == dns.UNKNOWN {
-			filtered = append(filtered, appDomain)
-		}
-	}
+	bar = progressbar.NewProgressBar(len(unresolvedDomains), "Checking domains")
+	filtered := dnsChecker.GetInactiveAppDomains(bar, unresolvedDomains, apps, options.includeUnknown)
+	bar.Finish()
+	bar.Clear()
 
 	// Print out the inactive apps, with their status (INACTIVE/PARTIAL/UNKNOWN)
 	return printDomains(filtered)
@@ -124,6 +105,14 @@ func getAppServers(logger *log.Logger, user, key string) ([]serverpilot.AppServe
 	return appServers, nil
 }
 
+func getAllDomains(appServers []serverpilot.AppServer) []string {
+	var domains []string
+	for _, appServer := range appServers {
+		domains = append(domains, appServer.Domains...)
+	}
+	return domains
+}
+
 func createLogger(isVerbose bool) *log.Logger {
 	logger := log.New(io.Discard, "", 0)
 	if isVerbose {
@@ -132,21 +121,8 @@ func createLogger(isVerbose bool) *log.Logger {
 	return logger
 }
 
-func createDomainChecker(logger *log.Logger, cloudflareCreds string) *dns.DnsChecker {
-	var creds *dns.Credentials
-	if cloudflareCreds != "" {
-		split := strings.Split(cloudflareCreds, ":")
-		creds = &dns.Credentials{split[0], split[1]}
-	}
-
-	return dns.NewDnsChecker(dns.NewResolver(creds, nil, nil, logger))
-}
-
-type AppDomainStatus struct {
-	AppId      string
-	Domain     string
-	ServerName string
-	Status     int
+func createDomainChecker(logger *log.Logger, checker *dns.CloudflareCredentialsChecker) *dns.DnsChecker {
+	return dns.NewDnsChecker(dns.NewResolver(nil, checker, nil, logger), checker)
 }
 
 func getServerForApp(app serverpilot.App, servers []serverpilot.Server) serverpilot.Server {
@@ -159,7 +135,7 @@ func getServerForApp(app serverpilot.App, servers []serverpilot.Server) serverpi
 	return serverpilot.Server{}
 }
 
-func printDomains(domains []AppDomainStatus) error {
+func printDomains(domains []dns.AppDomainStatus) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 	fmt.Fprintln(w, "APP ID\tDOMAIN\tSERVER\tSTATUS\t")
 	for _, domain := range domains {
