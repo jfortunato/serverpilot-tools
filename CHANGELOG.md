@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.0](https://github.com/jfortunato/serverpilot-tools/compare/v0.0.2...v0.1.0) (2023-09-22)
+
+
+### Features
+
+* List a limited number of domains for cloudflare prompt ([7b16054](https://github.com/jfortunato/serverpilot-tools/commit/7b16054dd5208347c5b71860c192425d1a7cdfb1))
+* Prompt for cloudflare credentials at runtime ([2247a38](https://github.com/jfortunato/serverpilot-tools/commit/2247a38959b351a4a5caddb7bb1d6351ecd14a4b))
+* Show another progress bar for inactive evaluation step ([ef4f51e](https://github.com/jfortunato/serverpilot-tools/commit/ef4f51e1f171269d88e1c2da6db89aab2dd611dd))
+
 ## [0.0.2](https://github.com/jfortunato/serverpilot-tools/compare/v0.0.1...v0.0.2) (2023-07-07)
 
 
