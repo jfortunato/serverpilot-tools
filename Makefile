@@ -43,9 +43,9 @@ release: platform-linux platform-darwin platform-windows
 	cd build && tar -zcf release/serverpilot-tools-$(VERSION)-Linux_arm64.tar.gz serverpilot-tools-linux-arm64
 	cd build && tar -zcf release/serverpilot-tools-$(VERSION)-Darwin_x86_64.tar.gz serverpilot-tools-darwin-amd64
 	cd build && tar -zcf release/serverpilot-tools-$(VERSION)-Darwin_arm64.tar.gz serverpilot-tools-darwin-arm64
-	cd build && zip release/serverpilot-tools-$(VERSION)-Windows_x86_64.zip serverpilot-tools-windows-amd64
-	cd build && zip release/serverpilot-tools-$(VERSION)-Windows_i386.zip serverpilot-tools-windows-386
-	cd build && zip release/serverpilot-tools-$(VERSION)-Windows_arm64.zip serverpilot-tools-windows-arm64
+	cd build && zip -r release/serverpilot-tools-$(VERSION)-Windows_x86_64.zip serverpilot-tools-windows-amd64
+	cd build && zip -r release/serverpilot-tools-$(VERSION)-Windows_i386.zip serverpilot-tools-windows-386
+	cd build && zip -r release/serverpilot-tools-$(VERSION)-Windows_arm64.zip serverpilot-tools-windows-arm64
 	cd build/release && sha256sum serverpilot-tools-$(VERSION)-Linux_x86_64.tar.gz >> checksums.txt
 	cd build/release && sha256sum serverpilot-tools-$(VERSION)-Linux_i386.tar.gz >> checksums.txt
 	cd build/release && sha256sum serverpilot-tools-$(VERSION)-Linux_arm64.tar.gz >> checksums.txt
