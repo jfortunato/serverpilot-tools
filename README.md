@@ -42,16 +42,10 @@ serverpilot-tools apps list <client_id> <api_key> --max-runtime php8.0
 
 ### Find apps that are inactive (DNS not pointing to the server)
 
-Only show apps that are **known** to be inactive. This checks public DNS records to see if they are pointed at the server, but won't be able to resolve records behind a proxy. (i.e. DNS is managed by Cloudflare)
+Only show apps that are **known** to be inactive. This checks public DNS records to see if they are pointed at the server. If the DNS records are behind CloudFlare, it will automatically detect that and you will need to provide your CloudFlare API credentials.
 
 ```shell
 serverpilot-tools apps inactive <client_id> <api_key>
-```
-
-To resolve DNS records behind CloudFlare, you can provide your CloudFlare api keys via the `cloudflare-credentials` option. This will use the CloudFlare API to resolve DNS records. (Only 1 CloudFlare account is supported at this time.)
-
-```shell
-serverpilot-tools apps inactive <client_id> <api_key> --cloudflare-credentials "foo@example.com:1234567890abcdef1234567890abcdef"
 ```
 
 ## Downloads
