@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/jfortunato/serverpilot-tools/compare/v0.1.0...v0.1.1) (2024-02-29)
+
+
+### Performance Improvements
+
+* Speed up dns resolution using goroutines ([5dac283](https://github.com/jfortunato/serverpilot-tools/commit/5dac283ceb16747e18ce047a38f2a49415a51fac))
+
 ## [0.1.0](https://github.com/jfortunato/serverpilot-tools/compare/v0.0.2...v0.1.0) (2023-09-22)
 
 
