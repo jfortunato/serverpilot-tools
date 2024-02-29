@@ -5,6 +5,7 @@ import (
 	"github.com/jfortunato/serverpilot-tools/internal/serverpilot"
 	"golang.org/x/net/publicsuffix"
 	"strings"
+	"sync"
 )
 
 const (
@@ -71,20 +72,45 @@ func (c *DnsChecker) EvaluateDomains(ticker progressbar.Ticker, domains []string
 func (c *DnsChecker) GetInactiveAppDomains(ticker progressbar.Ticker, domains []UnresolvedDomain, appservers []serverpilot.AppServer, includeUnknown bool) []AppDomainStatus {
 	var results []AppDomainStatus
 
-	// Loop through each domain, and check if it resolves to the server
-	for _, domain := range domains {
-		// Find the appserver that matches the domain
-		appserver := findMatchingAppServer(domain, appservers)
-
-		status := c.CheckStatus(domain, appserver.Server.Ipaddress)
-
-		if status == INACTIVE || (includeUnknown && status == UNKNOWN) {
-			results = append(results, AppDomainStatus{appserver.Id, domain.Name, appserver.Server.Name, status})
+	for _, domain := range c.getAppDomainStatuses(ticker, domains, appservers) {
+		// Filter out the results for only the inactive domains
+		if domain.Status == INACTIVE || (includeUnknown && domain.Status == UNKNOWN) {
+			results = append(results, domain)
 		}
-
-		// Tick the progress bar
-		ticker.Tick()
 	}
+
+	return results
+}
+
+// Resolve a list of UnresolvedDomains and determine it's "status" (OK, INACTIVE, UNKNOWN) based on the
+// server it is supposed to be pointing to.
+func (c *DnsChecker) getAppDomainStatuses(ticker progressbar.Ticker, domains []UnresolvedDomain, appservers []serverpilot.AppServer) []AppDomainStatus {
+	var results = make([]AppDomainStatus, len(domains))
+
+	var sem = make(chan bool, 100) // Use a semaphore to limit the number of concurrent goroutines
+	var wg sync.WaitGroup
+	// Loop through each domain, and check if it resolves to the server
+	for i, domain := range domains {
+		sem <- true // Blocks if the channel is full
+
+		wg.Add(1)
+		go func(i int, domain UnresolvedDomain) {
+			defer wg.Done()
+
+			// Find the appserver that matches the domain
+			appserver := findMatchingAppServer(domain, appservers)
+
+			status := c.CheckStatus(domain, appserver.Server.Ipaddress)
+
+			results[i] = AppDomainStatus{appserver.Id, domain.Name, appserver.Server.Name, status}
+
+			// Tick the progress bar
+			ticker.Tick()
+
+			<-sem // Release a spot
+		}(i, domain)
+	}
+	wg.Wait()
 
 	return results
 }
